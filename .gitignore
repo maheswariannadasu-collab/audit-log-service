@@ -1,0 +1,14 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/AuditLog.API/AuditLog.API/bin/Debug/net10.0
+/AuditLog.API/AuditLog.API/obj
+/AuditLog.API/obj/Debug/net11.0
+/AuditLog.BLL/AuditLog.BLL/bin/Debug/net10.0
+/AuditLog.BLL/AuditLog.BLL/obj
+/AuditLog.DAL/AuditLog.DAL/bin/Debug/net10.0
+/AuditLog.DAL/AuditLog.DAL/obj
+/AuditLog.Tests/AuditLog.Tests/bin/Debug/net10.0
+/AuditLog.Tests/AuditLog.Tests/obj

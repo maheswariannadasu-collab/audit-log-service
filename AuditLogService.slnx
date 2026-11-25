@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="AuditLog.API/AuditLog.API/AuditLog.API.csproj" Id="96747cff-8fa8-4694-9598-221af364659c" />
+  <Project Path="AuditLog.BLL/AuditLog.BLL/AuditLog.BLL.csproj" Id="850d49c9-56c5-4853-b964-54930e0703a3" />
+  <Project Path="AuditLog.DAL/AuditLog.DAL/AuditLog.DAL.csproj" Id="7dad221e-f376-4287-acd5-8f40684d9006" />
+  <Project Path="AuditLog.Tests/AuditLog.Tests/AuditLog.Tests.csproj" Id="1fbb1426-a2e3-468a-b0d8-6db844433dc5" />
+</Solution>
