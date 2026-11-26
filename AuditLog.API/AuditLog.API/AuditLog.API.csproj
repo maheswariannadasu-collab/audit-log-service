@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\AuditLog.BLL\AuditLog.BLL\AuditLog.BLL.csproj" />
+	<ProjectReference Include="..\..\AuditLog.DAL\AuditLog.DAL\AuditLog.DAL.csproj" />
   </ItemGroup>
 
 </Project>

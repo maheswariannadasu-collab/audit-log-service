@@ -1,5 +1,7 @@
 using AuditLog.BLL.Services;
 using AuditLog.DAL.Data;
+using AuditLog.BLL.Interfaces;
+using AuditLog.DAL.Repositories;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +23,16 @@ builder.Services.AddSingleton(
     new SqlConnectionFactory(connectionString));
 
 builder.Services.AddSingleton<AuditHashingService>();
+
+builder.Services.AddScoped<IAuditEventRepository>(services =>
+{
+    return new AuditEventRepository(
+        connectionString,
+        services.GetRequiredService<AuditHashingService>());
+});
+
+builder.Services.AddScoped<AuditEventWriterService>();
+
 
 var app = builder.Build();
 
