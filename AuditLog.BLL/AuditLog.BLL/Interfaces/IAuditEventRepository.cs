@@ -10,5 +10,13 @@ namespace AuditLog.BLL.Interfaces
         Task<long> InsertAsync(
             AuditEventData auditEvent,
             CancellationToken cancellationToken = default);
+
+        Task<AuditEventRecord?> GetByIdAsync(
+            long id,
+            CancellationToken cancellationToken = default);
+
+        Task<AuditEventRecord?> GetRedactedByIdAsync(
+        long id,
+        CancellationToken cancellationToken = default);
     }
 }

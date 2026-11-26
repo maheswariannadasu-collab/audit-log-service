@@ -1,6 +1,7 @@
+using AuditLog.BLL.Interfaces;
+using AuditLog.BLL.Models;
 using AuditLog.BLL.Services;
 using AuditLog.DAL.Data;
-using AuditLog.BLL.Interfaces;
 using AuditLog.DAL.Repositories;
 using Scalar.AspNetCore;
 
@@ -32,6 +33,66 @@ builder.Services.AddScoped<IAuditEventRepository>(services =>
 });
 
 builder.Services.AddScoped<AuditEventWriterService>();
+
+builder.Services.AddScoped<AuditEventQueryService>();
+
+// Audit Retention
+builder.Services.Configure<AuditRetentionOptions>(
+    builder.Configuration.GetSection("AuditRetention"));
+
+builder.Services.AddScoped<IAuditRetentionRepository>(sp =>
+{
+    var configuration =
+        sp.GetRequiredService<IConfiguration>();
+
+    return new AuditRetentionRepository(connectionString);
+});
+
+builder.Services.AddScoped<
+    IAuditRetentionService,
+    AuditRetentionService>();
+
+// Audit Redaction
+builder.Services.Configure<AuditRedactionOptions>(
+    builder.Configuration.GetSection("AuditRedaction"));
+
+builder.Services.AddScoped<
+    IAuditRedactionService,
+    AuditRedactionService>();
+
+builder.Services.AddScoped<IAuditRedactionRepository>(sp =>
+{
+    var configuration =
+        sp.GetRequiredService<IConfiguration>();
+
+    return new AuditRedactionRepository(connectionString);
+});
+
+// Audit Export
+builder.Services.AddScoped<IAuditExportRepository>(sp =>
+{
+    var configuration =
+        sp.GetRequiredService<IConfiguration>();
+
+    return new AuditExportRepository(connectionString);
+});
+
+builder.Services.AddScoped<
+    IAuditExportService,
+    AuditExportService>();
+
+// Audit Integrity
+builder.Services.AddScoped<IAuditIntegrityRepository>(sp =>
+{
+    var configuration =
+        sp.GetRequiredService<IConfiguration>();
+
+    return new AuditIntegrityRepository(connectionString);
+});
+
+builder.Services.AddScoped<
+    IAuditIntegrityService,
+    AuditIntegrityService>();
 
 
 var app = builder.Build();

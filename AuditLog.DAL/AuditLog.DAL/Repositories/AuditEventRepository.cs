@@ -183,5 +183,111 @@ namespace AuditLog.DAL.Repositories
                 throw;
             }
         }
+
+        public async Task<AuditEventRecord?> GetByIdAsync(
+    long id,
+    CancellationToken cancellationToken = default)
+        {
+            const string sql = """
+        SELECT
+            Id,
+            EventType,
+            ActorId,
+            ResourceType,
+            ResourceId,
+            PayloadJson,
+            EventTimestampUtc,
+            ContentHash,
+            PreviousHash,
+            RecordHash
+        FROM dbo.AuditEvents
+        WHERE Id = @Id;
+        """;
+
+            await using var connection =
+                new SqlConnection(_connectionString);
+
+            await connection.OpenAsync(cancellationToken);
+
+            await using var command =
+                new SqlCommand(sql, connection);
+
+            command.Parameters.Add("@Id", SqlDbType.BigInt).Value = id;
+
+            await using var reader =
+                await command.ExecuteReaderAsync(cancellationToken);
+
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            return new AuditEventRecord
+            {
+                Id = reader.GetInt64(0),
+                EventType = reader.GetString(1),
+                ActorId = reader.GetString(2),
+                ResourceType = reader.GetString(3),
+                ResourceId = reader.GetString(4),
+                PayloadJson = reader.GetString(5),
+                EventTimestampUtc = reader.GetDateTime(6),
+                ContentHash = (byte[])reader["ContentHash"],
+                PreviousHash = (byte[])reader["PreviousHash"],
+                RecordHash = (byte[])reader["RecordHash"]
+            };
+        }
+
+        public async Task<AuditEventRecord?> GetRedactedByIdAsync(
+    long id,
+    CancellationToken cancellationToken = default)
+        {
+            const string sql = """
+        SELECT
+            A.Id,
+            A.EventType,
+            A.ActorId,
+            A.ResourceType,
+            A.ResourceId,
+            COALESCE(R.RedactedPayloadJson, A.PayloadJson),
+            A.EventTimestampUtc,
+            A.ContentHash,
+            A.PreviousHash,
+            A.RecordHash
+        FROM dbo.AuditEvents A
+        LEFT JOIN dbo.AuditEventRedactions R
+            ON A.Id = R.AuditEventId
+        WHERE A.Id = @Id;
+        """;
+
+            await using var connection =
+                new SqlConnection(_connectionString);
+
+            await connection.OpenAsync(cancellationToken);
+
+            await using var command =
+                new SqlCommand(sql, connection);
+
+            command.Parameters.Add("@Id", SqlDbType.BigInt).Value = id;
+
+            await using var reader =
+                await command.ExecuteReaderAsync(cancellationToken);
+
+            if (!await reader.ReadAsync(cancellationToken))
+                return null;
+
+            return new AuditEventRecord
+            {
+                Id = reader.GetInt64(0),
+                EventType = reader.GetString(1),
+                ActorId = reader.GetString(2),
+                ResourceType = reader.GetString(3),
+                ResourceId = reader.GetString(4),
+                PayloadJson = reader.GetString(5),
+                EventTimestampUtc = reader.GetDateTime(6),
+                ContentHash = (byte[])reader["ContentHash"],
+                PreviousHash = (byte[])reader["PreviousHash"],
+                RecordHash = (byte[])reader["RecordHash"]
+            };
+        }
     }
 }

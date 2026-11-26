@@ -12,11 +12,14 @@ namespace AuditLog.API.Controllers
     public sealed class AuditEventsController : ControllerBase
     {
         private readonly AuditEventWriterService _writerService;
+        private readonly AuditEventQueryService _queryService;
+
 
         public AuditEventsController(
-            AuditEventWriterService writerService)
+            AuditEventWriterService writerService, AuditEventQueryService queryService)
         {
             _writerService = writerService;
+            _queryService = queryService;
         }
 
         [HttpPost]
@@ -64,6 +67,46 @@ namespace AuditLog.API.Controllers
             return StatusCode(
                 StatusCodes.Status201Created,
                 response);
+        }
+
+        [HttpGet("{id:long}")]
+        public async Task<IActionResult> GetById(
+        long id,
+        CancellationToken cancellationToken)
+        {
+            if (id <= 0)
+            {
+                return BadRequest("ID must be greater than zero.");
+            }
+
+            var auditEvent = await _queryService.GetRedactedByIdAsync(
+                id,
+                cancellationToken);
+
+            if (auditEvent is null)
+            {
+                return NotFound(new
+                {
+                    message = "Audit event not found."
+                });
+            }
+
+            var response = new AuditEventResponse
+            {
+                Id = auditEvent.Id,
+                EventType = auditEvent.EventType,
+                ActorId = auditEvent.ActorId,
+                ResourceType = auditEvent.ResourceType,
+                ResourceId = auditEvent.ResourceId,
+                EventTimestampUtc = auditEvent.EventTimestampUtc,
+                Payload = System.Text.Json.JsonDocument
+                    .Parse(auditEvent.PayloadJson).RootElement.Clone(),
+                ContentHash = Convert.ToHexString(auditEvent.ContentHash),
+                PreviousHash = Convert.ToHexString(auditEvent.PreviousHash),
+                RecordHash = Convert.ToHexString(auditEvent.RecordHash)
+            };
+
+            return Ok(response);
         }
     }
 }
