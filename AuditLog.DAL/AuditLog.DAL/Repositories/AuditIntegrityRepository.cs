@@ -1,9 +1,7 @@
 ﻿using AuditLog.BLL.Interfaces;
 using AuditLog.BLL.Models;
 using Microsoft.Data.SqlClient;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Runtime.CompilerServices;
 
 namespace AuditLog.DAL.Repositories
 {
@@ -17,8 +15,9 @@ namespace AuditLog.DAL.Repositories
             _connectionString = connectionString;
         }
 
-        public async Task<List<AuditEventRecord>>
-            GetAllForIntegrityCheckAsync(
+        public async IAsyncEnumerable<AuditIntegrityRecord>
+            StreamForIntegrityCheckAsync(
+                [EnumeratorCancellation]
                 CancellationToken cancellationToken = default)
         {
             const string sql = """
@@ -32,12 +31,11 @@ namespace AuditLog.DAL.Repositories
                 EventTimestampUtc,
                 ContentHash,
                 PreviousHash,
-                RecordHash
+                RecordHash,
+                COUNT_BIG(*) OVER() AS TotalRecords
             FROM dbo.AuditEvents
             ORDER BY Id ASC;
             """;
-
-            var records = new List<AuditEventRecord>();
 
             await using var connection =
                 new SqlConnection(_connectionString);
@@ -52,22 +50,24 @@ namespace AuditLog.DAL.Repositories
 
             while (await reader.ReadAsync(cancellationToken))
             {
-                records.Add(new AuditEventRecord
+                yield return new AuditIntegrityRecord
                 {
-                    Id = reader.GetInt64(0),
-                    EventType = reader.GetString(1),
-                    ActorId = reader.GetString(2),
-                    ResourceType = reader.GetString(3),
-                    ResourceId = reader.GetString(4),
-                    PayloadJson = reader.GetString(5),
-                    EventTimestampUtc = reader.GetDateTime(6),
-                    ContentHash = (byte[])reader["ContentHash"],
-                    PreviousHash = (byte[])reader["PreviousHash"],
-                    RecordHash = (byte[])reader["RecordHash"]
-                });
+                    TotalRecords = reader.GetInt64(10),
+                    Event = new AuditEventRecord
+                    {
+                        Id = reader.GetInt64(0),
+                        EventType = reader.GetString(1),
+                        ActorId = reader.GetString(2),
+                        ResourceType = reader.GetString(3),
+                        ResourceId = reader.GetString(4),
+                        PayloadJson = reader.GetString(5),
+                        EventTimestampUtc = reader.GetDateTime(6),
+                        ContentHash = (byte[])reader["ContentHash"],
+                        PreviousHash = (byte[])reader["PreviousHash"],
+                        RecordHash = (byte[])reader["RecordHash"]
+                    }
+                };
             }
-
-            return records;
         }
     }
 }

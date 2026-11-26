@@ -6,6 +6,7 @@ namespace AuditLog.API.Controllers
 {
     [ApiController]
     [Route("api/audit-integrity")]
+    [Route("audit")]
     public class AuditIntegrityController : ControllerBase
     {
         private readonly IAuditIntegrityService _integrityService;

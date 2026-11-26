@@ -1,9 +1,6 @@
 ﻿using AuditLog.BLL.Interfaces;
 using AuditLog.BLL.Models;
-using System;
-using System.Collections.Generic;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace AuditLog.BLL.Services
@@ -24,22 +21,23 @@ namespace AuditLog.BLL.Services
         public async Task<AuditIntegrityResult> VerifyAsync(
             CancellationToken cancellationToken = default)
         {
-            var records = await _repository.GetAllForIntegrityCheckAsync(
-                cancellationToken);
-
             var result = new AuditIntegrityResult
             {
                 IsValid = true,
-                TotalRecords = records.Count,
+                TotalRecords = 0,
                 VerifiedRecords = 0
             };
 
             byte[] expectedPreviousHash =
                 _hashingService.CreateGenesisHash();
 
-            foreach (var record in records)
+            await foreach (var integrityRecord in
+                _repository.StreamForIntegrityCheckAsync(cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                result.TotalRecords = integrityRecord.TotalRecords;
+                var record = integrityRecord.Event;
 
                 // 1. Verify previous hash.
                 if (!CryptographicOperations.FixedTimeEquals(

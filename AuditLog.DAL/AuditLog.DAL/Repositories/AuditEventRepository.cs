@@ -289,5 +289,115 @@ namespace AuditLog.DAL.Repositories
                 RecordHash = (byte[])reader["RecordHash"]
             };
         }
+
+        public async Task<AuditEventQueryResult> QueryAsync(
+            AuditEventQuery query,
+            CancellationToken cancellationToken = default)
+        {
+            const string filter = """
+                (@ActorId IS NULL OR A.ActorId = @ActorId)
+                AND (@ResourceType IS NULL OR A.ResourceType = @ResourceType)
+                AND (@ResourceId IS NULL OR A.ResourceId = @ResourceId)
+                AND (@EventType IS NULL OR A.EventType = @EventType)
+                AND (@FromUtc IS NULL OR A.EventTimestampUtc >= @FromUtc)
+                AND (@ToUtc IS NULL OR A.EventTimestampUtc < @ToUtc)
+                """;
+
+            var sql = $"""
+                SELECT COUNT_BIG(*)
+                FROM dbo.AuditEvents A
+                WHERE {filter};
+
+                SELECT
+                    A.Id,
+                    A.EventType,
+                    A.ActorId,
+                    A.ResourceType,
+                    A.ResourceId,
+                    COALESCE(R.RedactedPayloadJson, A.PayloadJson) AS PayloadJson,
+                    A.EventTimestampUtc,
+                    A.ContentHash,
+                    A.PreviousHash,
+                    A.RecordHash
+                FROM dbo.AuditEvents A
+                LEFT JOIN dbo.AuditEventRedactions R
+                    ON A.Id = R.AuditEventId
+                WHERE {filter}
+                ORDER BY A.Id DESC
+                OFFSET @Offset ROWS
+                FETCH NEXT @PageSize ROWS ONLY;
+                """;
+
+            await using var connection =
+                new SqlConnection(_connectionString);
+
+            await connection.OpenAsync(cancellationToken);
+
+            await using var command =
+                new SqlCommand(sql, connection);
+
+            command.Parameters.Add("@ActorId", SqlDbType.NVarChar, 150)
+                .Value = (object?)query.ActorId ?? DBNull.Value;
+            command.Parameters.Add("@ResourceType", SqlDbType.NVarChar, 100)
+                .Value = (object?)query.ResourceType ?? DBNull.Value;
+            command.Parameters.Add("@ResourceId", SqlDbType.NVarChar, 150)
+                .Value = (object?)query.ResourceId ?? DBNull.Value;
+            command.Parameters.Add("@EventType", SqlDbType.NVarChar, 100)
+                .Value = (object?)query.EventType ?? DBNull.Value;
+            command.Parameters.Add("@FromUtc", SqlDbType.DateTime2)
+                .Value = (object?)query.FromUtc?.UtcDateTime ?? DBNull.Value;
+            command.Parameters.Add("@ToUtc", SqlDbType.DateTime2)
+                .Value = (object?)query.ToUtc?.UtcDateTime ?? DBNull.Value;
+            command.Parameters.Add("@Offset", SqlDbType.BigInt)
+                .Value = ((long)query.PageNumber - 1) * query.PageSize;
+            command.Parameters.Add("@PageSize", SqlDbType.Int)
+                .Value = query.PageSize;
+
+            var records = new List<AuditEventRecord>();
+            long totalCount;
+
+            await using (var reader =
+                await command.ExecuteReaderAsync(cancellationToken))
+            {
+                if (!await reader.ReadAsync(cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        "Audit event query did not return a total count.");
+                }
+
+                totalCount = reader.GetInt64(0);
+
+                if (!await reader.NextResultAsync(cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        "Audit event query did not return a result page.");
+                }
+
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    records.Add(new AuditEventRecord
+                    {
+                        Id = reader.GetInt64(0),
+                        EventType = reader.GetString(1),
+                        ActorId = reader.GetString(2),
+                        ResourceType = reader.GetString(3),
+                        ResourceId = reader.GetString(4),
+                        PayloadJson = reader.GetString(5),
+                        EventTimestampUtc = reader.GetDateTime(6),
+                        ContentHash = (byte[])reader["ContentHash"],
+                        PreviousHash = (byte[])reader["PreviousHash"],
+                        RecordHash = (byte[])reader["RecordHash"]
+                    });
+                }
+            }
+
+            return new AuditEventQueryResult
+            {
+                Items = records,
+                TotalCount = totalCount,
+                PageNumber = query.PageNumber,
+                PageSize = query.PageSize
+            };
+        }
     }
 }

@@ -91,7 +91,51 @@ namespace AuditLog.API.Controllers
                 });
             }
 
-            var response = new AuditEventResponse
+            return Ok(ToResponse(auditEvent));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Query(
+            [FromQuery] AuditEventQueryRequest request,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await _queryService.QueryAsync(
+                    new AuditEventQuery
+                    {
+                        ActorId = request.ActorId,
+                        ResourceType = request.ResourceType,
+                        ResourceId = request.ResourceId,
+                        EventType = request.EventType,
+                        FromUtc = request.FromUtc,
+                        ToUtc = request.ToUtc,
+                        PageNumber = request.PageNumber,
+                        PageSize = request.PageSize
+                    },
+                    cancellationToken);
+
+                return Ok(new AuditEventPageResponse
+                {
+                    Items = result.Items.Select(ToResponse).ToArray(),
+                    TotalCount = result.TotalCount,
+                    PageNumber = result.PageNumber,
+                    PageSize = result.PageSize
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        private static AuditEventResponse ToResponse(
+            AuditEventRecord auditEvent)
+        {
+            using var payloadDocument =
+                JsonDocument.Parse(auditEvent.PayloadJson);
+
+            return new AuditEventResponse
             {
                 Id = auditEvent.Id,
                 EventType = auditEvent.EventType,
@@ -99,14 +143,11 @@ namespace AuditLog.API.Controllers
                 ResourceType = auditEvent.ResourceType,
                 ResourceId = auditEvent.ResourceId,
                 EventTimestampUtc = auditEvent.EventTimestampUtc,
-                Payload = System.Text.Json.JsonDocument
-                    .Parse(auditEvent.PayloadJson).RootElement.Clone(),
+                Payload = payloadDocument.RootElement.Clone(),
                 ContentHash = Convert.ToHexString(auditEvent.ContentHash),
                 PreviousHash = Convert.ToHexString(auditEvent.PreviousHash),
                 RecordHash = Convert.ToHexString(auditEvent.RecordHash)
             };
-
-            return Ok(response);
         }
     }
 }

@@ -7,7 +7,7 @@ namespace AuditLog.BLL.Interfaces
 {
     public interface IAuditIntegrityRepository
     {
-        Task<List<AuditEventRecord>> GetAllForIntegrityCheckAsync(
+        IAsyncEnumerable<AuditIntegrityRecord> StreamForIntegrityCheckAsync(
             CancellationToken cancellationToken = default);
     }
 }
