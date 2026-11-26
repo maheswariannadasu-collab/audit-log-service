@@ -18,7 +18,8 @@ The system is designed to:
 - Protect audit records using SHA-256 hash chaining.
 - Detect unauthorized database modifications.
 - Support retention, redaction, and bulk export.
-- Handle compliance requirements through documented assumptions and engineering decisions.
+- Provide account-scoped compliance reports to authorized readers.
+- Document assumptions and engineering decisions for compliance requirements.
 
 ## 2. Technology Stack
 
@@ -51,21 +52,14 @@ The application follows a layered architecture with separate controllers for dif
                       v
                 AuditLog.API
                       |
-       +--------------+--------------+
-       |              |              |
-       v              v              v
- Audit Events     Retention      Redaction
- Controller      Controller      Controller
-       |              |              |
-       +--------------+--------------+
-                      |
-             +--------+--------+
-             |                 |
-             v                 v
-        Export Controller   Integrity Controller
-             |                 |
-             +--------+--------+
-                      |
+       +--------------+------------------------------+
+       |                                             |
+       v                                             v
+ Audit, Retention, Redaction, Export,       Compliance Reports Controller
+ and Integrity Controllers                   [API-key policy]
+       |                                             |
+       +----------------------+----------------------+
+                              |
                       v
                  AuditLog.BLL
               Business Services
@@ -88,7 +82,8 @@ The application follows a layered architecture with separate controllers for dif
 **BLL Layer**
 - Contains business logic.
 - Defines service interfaces.
-- Handles audit processing, hashing, retention, redaction and export operations.
+- Handles audit processing, hashing, retention, redaction, export, and
+  compliance-report operations.
 
 **DAL Layer**
 - Contains repository implementations.
@@ -110,7 +105,9 @@ AuditLogService/
 │   │   ├── AuditIntegrityController.cs
 │   │   ├── AuditRetentionController.cs
 │   │   ├── AuditRedactionController.cs
-│   │   └── AuditExportController.cs
+│   │   ├── AuditExportController.cs
+│   │   └── ComplianceReportsController.cs
+│   ├── Auth/
 │   │
 │   ├── Program.cs
 │   ├── appsettings.json
@@ -204,19 +201,25 @@ end-to-end validation and independent bundle verification remain pending.
 
 ### Scenario C – Compliance Reporting
 
-**Requirement:**
+**Objective:** Allow authorized compliance readers to review client account
+activity by account and date range.
 
-"Regulators need to be able to audit access to client account data."
+Implemented functionality:
 
-Proposed approach:
+- `GET /api/compliance-reports/accounts/{accountId}/access` filters to
+  `ResourceType = ACCOUNT` and the requested account ID.
+- Supports optional inclusive `fromUtc`, exclusive `toUtc`, and bounded
+  pagination.
+- Returns the actor, event type, account, timestamp, and stored payload, using
+  the existing redaction-aware query path.
+- Protects this report endpoint with a configuration-backed
+  `X-Compliance-Api-Key`; the key is not stored in source control.
+- Reuses the existing audit-event table and query repository; no new DB
+  migration is required.
 
-- Identify client account access events.
-- Document requirement assumptions.
-- Design compliance reporting API.
-- Support account and date-based filtering.
-- Restrict access to authorized users.
-
-**Status:** Not implemented. Pending requirement clarification and design.
+**Status:** Implemented for the local assessment; SQL-backed end-to-end
+validation remains pending. The shared API key is not a production substitute
+for an identity provider or regulator-specific account authorization.
 
 ## 5. Database Design
 
@@ -318,6 +321,16 @@ Update the connection string in `AuditLog.API/appsettings.json`.
 
 Replace the server name with your SQL Server instance.
 
+Set a local compliance-report API key before starting the API. Use a random
+value of at least 32 characters and keep it out of source control:
+
+```powershell
+$env:ComplianceReporting__ApiKey = "<your-local-random-key-of-32-or-more-characters>"
+```
+
+Send it in the `X-Compliance-Api-Key` header when calling the compliance report
+endpoint. Missing or invalid keys receive HTTP 401.
+
 ### Step 5 – Build Solution
 
 ```bash
@@ -343,6 +356,7 @@ The application uses separate controllers to keep responsibilities independent.
 | AuditRetentionController | Manage audit retention |
 | AuditRedactionController | Manage payload redaction |
 | AuditExportController | Retrieve audit data for export |
+| ComplianceReportsController | Retrieve protected account-access reports |
 
 Example working endpoint:
 
@@ -360,6 +374,7 @@ The remaining endpoint routes should be verified against the actual controller a
 - Genesis hash validation.
 - Input validation.
 - Integrity verification.
+- Compliance account/date filtering, report projection, and API-key validation.
 
 ### Integration Testing
 - Database connectivity.
@@ -375,6 +390,7 @@ The remaining endpoint routes should be verified against the actual controller a
 - Verify audit records cannot be deleted through the API.
 - Validate hash-chain tampering detection.
 - Verify unauthorized access handling.
+- Verify compliance-report requests require a valid API key.
 
 ## 9. AI-Assisted Engineering Approach
 
@@ -426,13 +442,15 @@ Azure deployment is planned and has not yet been completed.
 
 The following areas require further implementation or validation:
 
-- SQL-backed end-to-end validation for retention, redaction, and export.
+- SQL-backed end-to-end validation for audit queries, retention, redaction,
+  export, and compliance reports.
 - Independent verification of exported bundles; the prototype does not sign or
   externally anchor bundle chain tips.
 - Redaction does not erase values from historical SQL backups or transaction
   logs.
 - Automated integration tests.
-- Compliance reporting.
+- Individual regulator identity, account-level authorization, and OIDC/JWT
+  integration for compliance reports.
 - Production Azure deployment.
 
 ## 13. Project Status
@@ -441,9 +459,9 @@ The following areas require further implementation or validation:
 |---|---|
 | Scenario A – Core Audit Logging | Implemented; SQL end-to-end validation pending |
 | Scenario B – Retention, Redaction and Export | Implemented; SQL end-to-end validation pending |
-| Scenario C – Compliance Reporting | Not implemented |
+| Scenario C – Compliance Reporting | Implemented; SQL end-to-end validation pending |
 | Architecture Documentation | Prepared |
-| Automated Testing | Pending final validation |
+| Automated Testing | Unit tests implemented; SQL integration pending |
 | Azure Deployment | Planned |
 
 ## 14. Author and Ownership

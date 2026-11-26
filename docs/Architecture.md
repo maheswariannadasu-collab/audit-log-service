@@ -13,6 +13,10 @@ The application follows a layered architecture.
 
 Client → API Controller → BLL Service → DAL Repository → SQL Server
 
+The compliance report endpoint follows the same flow and is protected by a
+configuration-backed API-key authentication scheme before the controller is
+invoked.
+
 ## Key Design Decisions
 
 - Dependency Injection for loose coupling.
@@ -21,6 +25,8 @@ Client → API Controller → BLL Service → DAL Repository → SQL Server
 - CancellationToken for request cancellation.
 - SHA-256 hashing for audit integrity.
 - SQL transactions and application locks for hash-chain consistency.
+- Compliance reports reuse the existing paginated audit-event query; no new
+  database table is introduced.
 
 ## Database Tables
 
@@ -32,4 +38,11 @@ Client → API Controller → BLL Service → DAL Repository → SQL Server
 - Parameterized SQL queries.
 - Hash chaining for tamper detection.
 - Separate storage for redacted data.
+- Account and date scoping for compliance reports.
+- Configuration-supplied API key required for the compliance-report route.
+- Secrets are supplied through configuration and are not committed.
 - Cancellation support for asynchronous operations.
+
+The shared API key is a local assessment mechanism. Production should use an
+identity provider and regulator-specific authorization. The current key does
+not identify individual regulators or enforce account-level entitlements.

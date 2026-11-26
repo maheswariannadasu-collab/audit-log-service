@@ -1,8 +1,10 @@
 using AuditLog.BLL.Interfaces;
 using AuditLog.BLL.Models;
 using AuditLog.BLL.Services;
+using AuditLog.API.Auth;
 using AuditLog.DAL.Data;
 using AuditLog.DAL.Repositories;
+using Microsoft.AspNetCore.Authentication;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +14,29 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme =
+            ComplianceApiKeyDefaults.SchemeName;
+        options.DefaultChallengeScheme =
+            ComplianceApiKeyDefaults.SchemeName;
+    })
+    .AddScheme<
+        AuthenticationSchemeOptions,
+        ComplianceApiKeyAuthenticationHandler>(
+            ComplianceApiKeyDefaults.SchemeName,
+            _ => { });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(
+        ComplianceApiKeyDefaults.PolicyName,
+        policy => policy
+            .AddAuthenticationSchemes(
+                ComplianceApiKeyDefaults.SchemeName)
+            .RequireAuthenticatedUser()
+            .RequireRole(ComplianceApiKeyDefaults.RoleName));
+});
 
 // Read database connection string
 var connectionString =
@@ -35,6 +60,9 @@ builder.Services.AddScoped<IAuditEventRepository>(services =>
 builder.Services.AddScoped<AuditEventWriterService>();
 
 builder.Services.AddScoped<AuditEventQueryService>();
+builder.Services.AddScoped<
+    IComplianceReportService,
+    ComplianceReportService>();
 
 // Audit Retention
 builder.Services.Configure<AuditRetentionOptions>(
@@ -106,6 +134,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
