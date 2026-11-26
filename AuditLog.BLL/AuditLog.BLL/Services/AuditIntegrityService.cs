@@ -69,25 +69,31 @@ namespace AuditLog.BLL.Services
                                 DateTimeKind.Utc))
                     };
 
-                    // 2. Verify content hash.
+                    // 2. Verify the current payload representation.
                     byte[] calculatedContentHash =
                         _hashingService.ComputeContentHash(auditEvent);
 
+                    byte[] expectedContentHash =
+                        integrityRecord.RedactedContentHash
+                        ?? record.ContentHash;
+
                     if (!CryptographicOperations.FixedTimeEquals(
                             calculatedContentHash,
-                            record.ContentHash))
+                            expectedContentHash))
                     {
                         return Fail(
                             result,
                             record.Id,
-                            "Content hash mismatch.");
+                            integrityRecord.RedactedContentHash is null
+                                ? "Content hash mismatch."
+                                : "Redacted content hash mismatch.");
                     }
 
-                    // 3. Verify record hash.
+                    // The chain remains anchored to the original content hash.
                     byte[] calculatedRecordHash =
                         _hashingService.ComputeRecordHash(
                             record.PreviousHash,
-                            calculatedContentHash);
+                            record.ContentHash);
 
                     if (!CryptographicOperations.FixedTimeEquals(
                             calculatedRecordHash,

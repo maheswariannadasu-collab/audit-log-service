@@ -56,6 +56,56 @@ public sealed class AuditIntegrityServiceTests
         Assert.Equal(0, result.VerifiedRecords);
     }
 
+    [Fact]
+    public async Task VerifyAsync_AcceptsRedactedPayloadWithOriginalChainHash()
+    {
+        var records = CreateTwoRecordChain();
+        var first = records[0];
+        var redactedPayload = """{"value":"[REDACTED]"}""";
+        var redactedContentHash = ComputeContentHash(first, redactedPayload);
+        records[0] = WithPayload(first, redactedPayload);
+
+        var service = new AuditIntegrityService(
+            new InMemoryAuditIntegrityRepository(
+                records,
+                new Dictionary<long, byte[]>
+                {
+                    [first.Id] = redactedContentHash
+                }),
+            new AuditHashingService());
+
+        var result = await service.VerifyAsync();
+
+        Assert.True(result.IsValid);
+        Assert.Equal(2, result.TotalRecords);
+        Assert.Equal(2, result.VerifiedRecords);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_DetectsChangedRedactedPayload()
+    {
+        var records = CreateTwoRecordChain();
+        var first = records[0];
+        records[0] = WithPayload(first, """{"value":"altered"}""");
+
+        var service = new AuditIntegrityService(
+            new InMemoryAuditIntegrityRepository(
+                records,
+                new Dictionary<long, byte[]>
+                {
+                    [first.Id] = ComputeContentHash(
+                        first,
+                        """{"value":"[REDACTED]"}""")
+                }),
+            new AuditHashingService());
+
+        var result = await service.VerifyAsync();
+
+        Assert.False(result.IsValid);
+        Assert.Equal(first.Id, result.FailedRecordId);
+        Assert.Equal("Redacted content hash mismatch.", result.Message);
+    }
+
     private static List<AuditEventRecord> CreateTwoRecordChain()
     {
         var hashingService = new AuditHashingService();
@@ -111,15 +161,54 @@ public sealed class AuditIntegrityServiceTests
         };
     }
 
+    private static byte[] ComputeContentHash(
+        AuditEventRecord record,
+        string payloadJson)
+    {
+        using var payload = JsonDocument.Parse(payloadJson);
+        return new AuditHashingService().ComputeContentHash(
+            new AuditEventData
+            {
+                EventType = record.EventType,
+                ActorId = record.ActorId,
+                ResourceType = record.ResourceType,
+                ResourceId = record.ResourceId,
+                Payload = payload.RootElement,
+                EventTimestampUtc = new DateTimeOffset(
+                    DateTime.SpecifyKind(
+                        record.EventTimestampUtc,
+                        DateTimeKind.Utc))
+            });
+    }
+
+    private static AuditEventRecord WithPayload(
+        AuditEventRecord record,
+        string payloadJson) =>
+        new()
+        {
+            Id = record.Id,
+            EventType = record.EventType,
+            ActorId = record.ActorId,
+            ResourceType = record.ResourceType,
+            ResourceId = record.ResourceId,
+            PayloadJson = payloadJson,
+            EventTimestampUtc = record.EventTimestampUtc,
+            ContentHash = record.ContentHash,
+            PreviousHash = record.PreviousHash,
+            RecordHash = record.RecordHash
+        };
+
     private sealed class InMemoryAuditIntegrityRepository(
-        List<AuditEventRecord> records) : IAuditIntegrityRepository
+        List<AuditEventRecord> records,
+        IReadOnlyDictionary<long, byte[]>? redactedHashes = null)
+        : IAuditIntegrityRepository
     {
         public IAsyncEnumerable<AuditIntegrityRecord>
             StreamForIntegrityCheckAsync(
                 CancellationToken cancellationToken = default) =>
             EnumerateRecords(records, cancellationToken);
 
-        private static async IAsyncEnumerable<AuditIntegrityRecord>
+        private async IAsyncEnumerable<AuditIntegrityRecord>
             EnumerateRecords(
                 IReadOnlyCollection<AuditEventRecord> source,
                 [EnumeratorCancellation]
@@ -133,7 +222,9 @@ public sealed class AuditIntegrityServiceTests
                 yield return new AuditIntegrityRecord
                 {
                     Event = record,
-                    TotalRecords = totalRecords
+                    TotalRecords = totalRecords,
+                    RedactedContentHash =
+                        redactedHashes?.GetValueOrDefault(record.Id)
                 };
                 await Task.Yield();
             }

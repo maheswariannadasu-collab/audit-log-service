@@ -172,22 +172,24 @@ Implemented functionality:
 **Objective:** Extend the audit service with audit data management functionality.
 
 **Retention**
-- Identify older audit events.
-- Mark records as archived.
-- Record archive timestamps.
-- Preserve original audit records.
+- `POST /api/audit-retention/archive` marks records older than the configured
+  `AuditRetention:RetentionDays` as archived.
+- Archived rows remain in the chain and are included in verification.
 
 **Redaction**
-- Retrieve original event payload.
-- Redact selected fields.
-- Store redacted payload separately.
-- Prevent duplicate redaction records.
-- Preserve original audit data.
+- `POST /api/audit-redaction/apply` replaces configured payload values in the
+  live event row and records redaction metadata.
+- The original content hash remains the chain anchor; a separate hash verifies
+  the current redacted payload.
+- Duplicate redaction is rejected, except legacy redaction rows without the new
+  redacted-content hash can be upgraded.
+- SQL backups and transaction logs may retain historical values; this is not
+  secure erasure from backups.
 
 **Export**
-- Retrieve audit events using optional UTC date filters.
-- Include event details and hash information.
-- Order records by timestamp and ID.
+- JSON and CSV exports accept optional actor/resource and UTC date filters.
+- `GET /api/audit-export/bundle` requires `actorId` or `resourceId` and includes
+  selected events, their hashes, genesis/tip values, and a hash-only chain proof.
 
 **Main Components:**
 - AuditRetentionController
@@ -197,7 +199,8 @@ Implemented functionality:
 - AuditRedactionRepository
 - AuditExportRepository
 
-**Status:** Repository implementations shared; final service, API and testing validation pending.
+**Status:** Retention, redaction, and export APIs are implemented; SQL-backed
+end-to-end validation and independent bundle verification remain pending.
 
 ### Scenario C – Compliance Reporting
 
@@ -241,7 +244,9 @@ Database: `AuditLogDb`
 
 **dbo.AuditEventRedactions**
 
-Stores redacted payload information and redaction metadata separately from the original audit event.
+Stores redacted payload information, request metadata, and the hash of the
+current redacted payload. `ContentHash` on the event remains the original chain
+anchor.
 
 ### Hash Chain Design
 
@@ -295,6 +300,9 @@ Execute the SQL scripts available in:
 ```text
 database/Scripts/
 ```
+
+Apply scripts `001` through `004` in order. Script `004` adds the redacted
+content hash required by redaction-aware verification and export.
 
 ### Step 4 – Configure Connection String
 
@@ -358,9 +366,9 @@ The remaining endpoint routes should be verified against the actual controller a
 - Audit event insertion and retrieval.
 - Filtering and pagination.
 - Concurrent event insertion.
-- Retention processing.
-- Redaction and duplicate prevention.
-- Export date filtering.
+- Retention processing and archived-record verification.
+- Redaction, duplicate prevention, and live-payload replacement.
+- Targeted export and independent chain-proof verification.
 
 ### Security Testing
 - Verify audit records cannot be modified through the API.
@@ -418,10 +426,12 @@ Azure deployment is planned and has not yet been completed.
 
 The following areas require further implementation or validation:
 
-- Complete end-to-end integrity verification.
-- Final retention and redaction API validation.
-- Verifiable bulk export.
-- Automated unit and integration tests.
+- SQL-backed end-to-end validation for retention, redaction, and export.
+- Independent verification of exported bundles; the prototype does not sign or
+  externally anchor bundle chain tips.
+- Redaction does not erase values from historical SQL backups or transaction
+  logs.
+- Automated integration tests.
 - Compliance reporting.
 - Production Azure deployment.
 
@@ -429,8 +439,8 @@ The following areas require further implementation or validation:
 
 | Scenario | Status |
 |---|---|
-| Scenario A – Core Audit Logging | Implemented; final validation pending |
-| Scenario B – Retention, Redaction and Export | Partially implemented |
+| Scenario A – Core Audit Logging | Implemented; SQL end-to-end validation pending |
+| Scenario B – Retention, Redaction and Export | Implemented; SQL end-to-end validation pending |
 | Scenario C – Compliance Reporting | Not implemented |
 | Architecture Documentation | Prepared |
 | Automated Testing | Pending final validation |

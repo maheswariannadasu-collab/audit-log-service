@@ -71,6 +71,10 @@ namespace AuditLog.API.Controllers
             {
                 return BadRequest(new { Message = ex.Message });
             }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { Message = ex.Message });
+            }
             catch (JsonException)
             {
                 return BadRequest(new

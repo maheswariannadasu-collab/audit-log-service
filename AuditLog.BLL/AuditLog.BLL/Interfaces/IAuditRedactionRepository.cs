@@ -4,13 +4,14 @@ namespace AuditLog.BLL.Interfaces
 {
     public interface IAuditRedactionRepository
     {
-        Task<string?> GetPayloadAsync(
+        Task<AuditEventRecord?> GetEventForRedactionAsync(
             long auditEventId,
             CancellationToken cancellationToken);
 
         Task SaveRedactionAsync(
             AuditRedactionRequest request,
             string redactedPayloadJson,
+            byte[] redactedContentHash,
             CancellationToken cancellationToken);
     }
 }

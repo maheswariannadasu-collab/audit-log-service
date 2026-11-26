@@ -2,6 +2,7 @@
 
 using AuditLog.BLL.Interfaces;
 using Microsoft.Data.SqlClient;
+using System.Data;
 
 namespace AuditLog.DAL.Repositories
 {
@@ -34,7 +35,8 @@ namespace AuditLog.DAL.Repositories
             await using var command =
                 new SqlCommand(sql, connection);
 
-            command.Parameters.AddWithValue("@CutoffUtc", cutoffUtc);
+            command.Parameters.Add("@CutoffUtc", SqlDbType.DateTime2)
+                .Value = cutoffUtc;
 
             await connection.OpenAsync(cancellationToken);
 

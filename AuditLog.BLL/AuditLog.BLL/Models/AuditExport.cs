@@ -1,22 +1,33 @@
 ﻿
-namespace AuditLog.BLL.Models
+﻿using System.Text.Json;
+
+namespace AuditLog.BLL.Models;
+
+public sealed class AuditExport
 {
-    public class AuditExport
-    {
-        public long Id { get; set; }
+    public long Id { get; init; }
 
-        public string EventType { get; set; } = string.Empty;
+    public string EventType { get; init; } = string.Empty;
 
-        public string ResourceType { get; set; } = string.Empty;
+    public string ActorId { get; init; } = string.Empty;
 
-        public string ResourceId { get; set; } = string.Empty;
+    public string ResourceType { get; init; } = string.Empty;
 
-        public DateTime EventTimestampUtc { get; set; }
+    public string ResourceId { get; init; } = string.Empty;
 
-        public bool IsArchived { get; set; }
+    public JsonElement Payload { get; init; }
 
-        public string ContentHash { get; set; } = string.Empty;
+    public DateTime EventTimestampUtc { get; init; }
 
-        public string PreviousHash { get; set; } = string.Empty;
-    }
+    public bool IsArchived { get; init; }
+
+    public bool IsRedacted { get; init; }
+
+    public string ContentHash { get; init; } = string.Empty;
+
+    public string? RedactedContentHash { get; set; }
+
+    public string PreviousHash { get; init; } = string.Empty;
+
+    public string RecordHash { get; init; } = string.Empty;
 }

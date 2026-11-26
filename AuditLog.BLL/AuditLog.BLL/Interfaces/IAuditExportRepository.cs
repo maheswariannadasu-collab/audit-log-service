@@ -7,6 +7,12 @@ namespace AuditLog.BLL.Interfaces
         Task<List<AuditExport>> GetAuditEventsAsync(
             DateTime? fromUtc,
             DateTime? toUtc,
+            string? actorId,
+            string? resourceId,
+            CancellationToken cancellationToken);
+
+        Task<List<AuditExportChainRecord>> GetChainProofAsync(
+            long throughId,
             CancellationToken cancellationToken);
     }
 }

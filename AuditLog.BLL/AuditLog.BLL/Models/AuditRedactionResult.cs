@@ -3,7 +3,7 @@ namespace AuditLog.BLL.Models
 {
     public class AuditRedactionResult
     {
-        public int AuditEventId { get; set; }
+        public long AuditEventId { get; set; }
 
         public List<string> RedactedFields { get; set; } = new();
 

@@ -10,13 +10,16 @@ namespace AuditLog.BLL.Services
     {
         private readonly AuditRedactionOptions _options;
         private readonly IAuditRedactionRepository _repository;
+        private readonly AuditHashingService _hashingService;
 
         public AuditRedactionService(
             IOptions<AuditRedactionOptions> options,
-            IAuditRedactionRepository repository)
+            IAuditRedactionRepository repository,
+            AuditHashingService hashingService)
         {
             _options = options.Value;
             _repository = repository;
+            _hashingService = hashingService;
         }
 
         public string RedactJson(string json)
@@ -62,23 +65,40 @@ namespace AuditLog.BLL.Services
                 throw new ArgumentException(
                     "One or more fields are not approved for redaction.");
 
-            var originalJson = await _repository.GetPayloadAsync(
+            var auditEventRecord = await _repository.GetEventForRedactionAsync(
                 request.AuditEventId,
                 cancellationToken);
 
-            if (originalJson == null)
+            if (auditEventRecord is null)
                 throw new KeyNotFoundException("Audit event not found.");
 
-            var node = JsonNode.Parse(originalJson)
+            var node = JsonNode.Parse(auditEventRecord.PayloadJson)
                 ?? throw new JsonException("Invalid stored payload.");
 
             RedactNode(node, request.FieldsToRedact);
 
             var redactedJson = node.ToJsonString();
+            using var redactedDocument = JsonDocument.Parse(redactedJson);
+
+            var redactedEvent = new AuditEventData
+            {
+                EventType = auditEventRecord.EventType,
+                ActorId = auditEventRecord.ActorId,
+                ResourceType = auditEventRecord.ResourceType,
+                ResourceId = auditEventRecord.ResourceId,
+                EventTimestampUtc = new DateTimeOffset(
+                    DateTime.SpecifyKind(
+                        auditEventRecord.EventTimestampUtc,
+                        DateTimeKind.Utc)),
+                Payload = redactedDocument.RootElement
+            };
+            byte[] redactedContentHash =
+                _hashingService.ComputeContentHash(redactedEvent);
 
             await _repository.SaveRedactionAsync(
                 request,
                 redactedJson,
+                redactedContentHash,
                 cancellationToken);
 
             return new AuditRedactionResult

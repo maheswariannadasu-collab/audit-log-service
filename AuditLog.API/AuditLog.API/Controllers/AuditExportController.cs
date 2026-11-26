@@ -18,12 +18,14 @@ namespace AuditLog.API.Controllers
         public async Task<IActionResult> ExportJson(
             DateTime? fromUtc,
             DateTime? toUtc,
+            string? actorId,
+            string? resourceId,
             CancellationToken cancellationToken)
         {
             try
             {
                 var data = await _service.ExportJsonAsync(
-                    fromUtc, toUtc, cancellationToken);
+                    fromUtc, toUtc, actorId, resourceId, cancellationToken);
 
                 return File(
                     data,
@@ -40,17 +42,47 @@ namespace AuditLog.API.Controllers
         public async Task<IActionResult> ExportCsv(
             DateTime? fromUtc,
             DateTime? toUtc,
+            string? actorId,
+            string? resourceId,
             CancellationToken cancellationToken)
         {
             try
             {
                 var data = await _service.ExportCsvAsync(
-                    fromUtc, toUtc, cancellationToken);
+                    fromUtc, toUtc, actorId, resourceId, cancellationToken);
 
                 return File(
                     data,
                     "text/csv",
                     "audit-events.csv");
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("bundle")]
+        public async Task<IActionResult> ExportBundle(
+            string? actorId,
+            string? resourceId,
+            DateTime? fromUtc,
+            DateTime? toUtc,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var data = await _service.ExportBundleAsync(
+                    actorId,
+                    resourceId,
+                    fromUtc,
+                    toUtc,
+                    cancellationToken);
+
+                return File(
+                    data,
+                    "application/json",
+                    "audit-export-bundle.json");
             }
             catch (ArgumentException ex)
             {

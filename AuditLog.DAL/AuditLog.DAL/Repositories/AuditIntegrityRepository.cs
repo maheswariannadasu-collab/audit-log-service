@@ -22,19 +22,22 @@ namespace AuditLog.DAL.Repositories
         {
             const string sql = """
             SELECT
-                Id,
-                EventType,
-                ActorId,
-                ResourceType,
-                ResourceId,
-                PayloadJson,
-                EventTimestampUtc,
-                ContentHash,
-                PreviousHash,
-                RecordHash,
+                A.Id,
+                A.EventType,
+                A.ActorId,
+                A.ResourceType,
+                A.ResourceId,
+                A.PayloadJson,
+                A.EventTimestampUtc,
+                A.ContentHash,
+                A.PreviousHash,
+                A.RecordHash,
+                R.RedactedContentHash,
                 COUNT_BIG(*) OVER() AS TotalRecords
-            FROM dbo.AuditEvents
-            ORDER BY Id ASC;
+            FROM dbo.AuditEvents A
+            LEFT JOIN dbo.AuditEventRedactions R
+                ON A.Id = R.AuditEventId
+            ORDER BY A.Id ASC;
             """;
 
             await using var connection =
@@ -52,7 +55,10 @@ namespace AuditLog.DAL.Repositories
             {
                 yield return new AuditIntegrityRecord
                 {
-                    TotalRecords = reader.GetInt64(10),
+                    RedactedContentHash = reader.IsDBNull(10)
+                        ? null
+                        : (byte[])reader["RedactedContentHash"],
+                    TotalRecords = reader.GetInt64(11),
                     Event = new AuditEventRecord
                     {
                         Id = reader.GetInt64(0),
