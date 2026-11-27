@@ -159,7 +159,14 @@ public sealed class ApiKeyAuthorizationTests
                 .GetRequiredService<IConfiguration>()
                 .GetConnectionString("AuditLogDb"));
 
-        using var response = await _client.GetAsync("/api/health/database");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/health/database");
+        request.Headers.Add(
+            ComplianceApiKeyDefaults.HeaderName,
+            ApiKeyAuthorizationApiFactory.ConfiguredKey);
+
+        using var response = await _client.SendAsync(request);
 
         var responseBody = await response.Content.ReadAsStringAsync();
         Assert.True(
@@ -179,7 +186,8 @@ public sealed class ApiKeyAuthorizationTests
     [InlineData("GET", "/api/audit-export/json")]
     [InlineData("GET", "/api/audit-export/csv")]
     [InlineData("GET", "/api/audit-export/bundle")]
-    public async Task ScenarioAAndBEndpoints_WithoutValidApiKey_ReturnUnauthorized(
+    [InlineData("GET", "/api/health/database")]
+    public async Task ProtectedEndpoints_WithoutValidApiKey_ReturnUnauthorized(
         string method,
         string path)
     {

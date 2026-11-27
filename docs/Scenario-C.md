@@ -99,6 +99,13 @@ Unit tests verify account scoping, the `ACCOUNT` resource-type constraint,
 date-bound and pagination forwarding, report-field projection, invalid account
 and date-range handling, and API-key acceptance/rejection behavior.
 
+SQL Server integration tests exercise the report endpoint against persisted
+account events, including date filtering and pagination. The engineer confirmed
+Scenario C was also tested against the target SQL Server database and that
+migrations `001`–`004` have been applied. See
+[Test-Coverage.md](Test-Coverage.md) for the integration-test command and
+results.
+
 ## Remaining production considerations
 
 The API key is intentionally a small local-assessment access gate, not a
@@ -106,5 +113,4 @@ replacement for an identity provider. The shared key also grants access to
 Scenario A and B operations, including writes, retention, and redaction.
 Production deployment should use an identity provider, assign least-privilege
 roles and account scopes, store secrets in a secret manager, and audit report
-access by the authenticated user. SQL Server-backed end-to-end testing is still
-required for the completed scenarios.
+access by the authenticated user.

@@ -71,18 +71,22 @@ storage and privacy limitations are covered separately in Scenario B.
 ## Validation
 
 The unit tests cover query validation and hash-chain verification, including
-detection of a changed payload. Run them with:
+detection of a changed payload. SQL Server integration tests also cover event
+creation, retrieval, filtered/paginated querying, both verification routes, and
+detection of direct database payload tampering.
 
-```powershell
-dotnet test AuditLogService.slnx
-```
+Run the integration suite as documented in
+[Test-Coverage.md](Test-Coverage.md). The engineer confirmed the target
+database has migrations `001`–`004` applied and Scenario A was tested against
+SQL Server.
 
-The current tests do not exercise SQL Server integration, concurrent database
-writes, or a direct database tampering workflow. Those remain end-to-end
-validation items.
+Concurrent database-writer stress testing and direct database permission
+restrictions are not covered by the current automated tests. The API does not
+provide an event update or delete operation; database hash verification detects
+changes but does not prevent privileged direct SQL changes.
 
 ## Status
 
 The write API, hash-chain creation and verification, filtered/paginated query
-API, and required verification route are implemented. SQL-backed end-to-end
-validation remains pending.
+API, and required verification route are implemented. Scenario A's SQL Server
+integration tests pass; concurrent-writer stress testing remains pending.

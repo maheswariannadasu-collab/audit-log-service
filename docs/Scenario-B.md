@@ -87,14 +87,22 @@ redaction values from backups or transaction logs.
 
 Unit tests cover retention-window calculation, redaction replacement and hash
 generation, export bundle construction/filtering, bundle filter validation,
-and verification of redacted chain records. They use in-memory repositories;
-SQL transaction behavior, retention updates, and exports still require
-end-to-end validation against SQL Server.
+and verification of redacted chain records. SQL Server integration tests
+exercise the API against a disposable database and verify retention state and
+idempotency, persisted redacted payload and hash metadata, duplicate-redaction
+handling, JSON/CSV/bundle exports, and hash-proof recomputation. The suite also
+directly changes stored payload data and verifies that chain checking detects
+the tampering.
 
-## Status and remaining validation
+Run the integration suite as documented in
+[Test-Coverage.md](Test-Coverage.md). The engineer confirmed migrations
+`001`–`004` are applied to the target database and Scenario B operations were
+validated against SQL Server.
 
-The retention, redaction, and export APIs and their service/data-layer
-implementations are present. Before treating Scenario B as validated, run the
-API against SQL Server after applying the scripts, confirm archived rows still
-verify, confirm redaction overwrites the live payload and the chain remains
-valid, and download and independently verify an export bundle.
+## Status and remaining limitations
+
+The retention, redaction, and export APIs are implemented and covered by
+passing SQL Server integration tests. Hash-only bundle proofs are verified by
+the tests, but bundles are not digitally signed or externally anchored.
+Redaction does not erase historical values from SQL backups or transaction
+logs.

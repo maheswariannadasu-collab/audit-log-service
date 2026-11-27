@@ -396,4 +396,85 @@ available AI-usage and session records do not reliably attribute individual
 files in those baseline commits to AI. They are therefore not described here
 as AI-generated.
 
+### 12. SQL Server integration tests for all API scenarios
+
+**Date / commit:** 2026-11-27; no commit at the time of this update.
+
+**Task request summary:** Add real SQL Server integration coverage for
+Scenarios A, B, and C, including API-key authorization, database operations,
+retention, redaction, export, and tampering detection; execute the suite and
+record actual results.
+
+**AI contribution:** Added an opt-in test fixture that creates a unique
+disposable SQL Server database, applies migrations `001`–`004`, uses the real
+API and repository implementations, and drops the test database at teardown.
+Added integration cases for all controller routes, successful health checks,
+event persistence/query pagination, both integrity routes, retention,
+redaction persistence and hash metadata, exports and proof recomputation,
+compliance report filtering/pagination, and raw SQL payload tampering.
+
+The route-authentication matrix covers all 13 controller route/method
+combinations with missing and invalid keys. Source inspection found the
+database health controller lacked the shared authorization policy; the policy
+was applied there and its unavailable-database test now sends a valid key.
+
+**Engineer decisions:** The suite requires explicit opt-in and an admin
+connection string to `master` on a dedicated test instance. The fixture uses
+an isolated generated database name and does not use or drop the application's
+configured `AuditLogDb`. The test database was confirmed removed after the
+run.
+
+**Files changed:**
+
+- `AuditLog.API/AuditLog.API/Controllers/HealthController.cs`
+- `AuditLog.Tests/AuditLog.Tests/ApiKeyAuthorizationTests.cs`
+- `AuditLog.Tests/AuditLog.Tests/AuditLog.Tests.csproj`
+- `AuditLog.Tests/AuditLog.Tests/SqlServerApiIntegrationTests.cs` (added)
+- `README.md`
+- `ATTESTATION.md`
+- `docs/Scenario-A.md`
+- `docs/Scenario-B.md`
+- `docs/Scenario-C.md`
+- `docs/Test-Coverage.md`
+- `docs/AI-Usage-Log.md`
+
+**Assistant-run validation:**
+
+- SQL Server integration filter: **10 passed, 0 failed, 0 skipped**.
+- Full suite with integration enabled: **143 passed, 0 failed, 0 skipped**.
+- Default full suite without opt-in: **133 passed, 0 failed, 10 skipped**.
+- All projects built successfully as part of the full test run.
+- Tests ran against LocalDB using a freshly created database; scripts
+  `001`–`004` were applied and the database was dropped afterward.
+
+**Coverage note:** The existing line/branch percentages are from the earlier
+132-test coverage collection and were not regenerated for this 143-test run.
+Concurrent-writer stress, production identity/account-level authorization,
+and externally signed or anchored export bundles remain limitations.
+
+### 13. Record engineer-confirmed API-key authorization validation
+
+**Date / commit:** 2026-11-27; no commit at the time of this update.
+
+**Engineer confirmation:** Unauthorized-access handling was validated and is
+working. Every controller endpoint, including database health, requires a
+valid API key.
+
+**AI contribution:** Updated the README security-testing status to distinguish
+the engineer-confirmed validation from the previously recorded automated
+authorization and SQL Server integration-test results.
+
+**Files changed:** `README.md` and `docs/AI-Usage-Log.md`.
+
+**Evidence limits:** No additional test command, run log, or test count was
+provided with this confirmation. It is recorded as engineer-reported
+validation; the earlier automated test results remain separately documented.
+
+## Current pending validation
+
+- Concurrent SQL Server writer stress testing.
+- Production identity, per-user/account authorization, and least-privilege
+  access policies; the current API key is shared across routes.
+- Production deployment and operational validation.
+
 

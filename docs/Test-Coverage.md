@@ -1,20 +1,74 @@
 # Test Execution and Coverage
 
-## Verified run
+## Latest verified test run
 
 - Verified: 2026-11-27
 - Target framework: .NET 10
-- Test command: `dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj`
-- Result: 132 passed, 0 failed, 0 skipped
-- API build: succeeded with 0 warnings and 0 errors
-- Coverage command: `dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj --collect:"XPlat Code Coverage"`
+- SQL Server: LocalDB `(localdb)\MSSQLLocalDB`
+- SQL integration methods: 10 passed, 0 failed, 0 skipped
+- Full suite with integration enabled: **143 passed, 0 failed, 0 skipped**
+- Full suite without integration opt-in: **133 passed, 0 failed, 10 skipped**
 
-The generated Cobertura report is written under
-`AuditLog.Tests\AuditLog.Tests\TestResults\<run-id>\coverage.cobertura.xml`.
+The integration tests use a real SQL Server database. The fixture creates a
+uniquely named disposable database (`AuditLogIntegration_<id>`), applies
+database scripts `001`–`004`, runs the tests, and drops the database afterward.
+The admin connection's initial catalog is `master` only so the fixture can
+create and drop databases. Tests do not run against `master` or the
+application's `AuditLogDB` database. The disposable test database was verified
+removed after the run.
 
-## Coverage results
+The admin connection string must connect to `master` on a dedicated test SQL
+Server instance and have permission to create and drop databases. For Windows
+LocalDB:
 
-Coverage across all instrumented project assemblies:
+```powershell
+$env:AUDITLOG_RUN_SQLSERVER_INTEGRATION_TESTS = "true"
+$env:AUDITLOG_SQLSERVER_ADMIN_CONNECTION_STRING = "Server=(localdb)\MSSQLLocalDB;Database=master;Trusted_Connection=True;TrustServerCertificate=True;Encrypt=False"
+dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj
+```
+
+Do not point the admin connection at a production or shared development
+instance. Without both environment variables, the SQL Server integration tests
+are skipped.
+
+To run only the SQL Server integration tests, use the same environment
+variables and add:
+
+```powershell
+dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj --filter Category=SqlServerIntegration
+```
+
+## SQL Server integration coverage
+
+The [integration test suite](../AuditLog.Tests/AuditLog.Tests/SqlServerApiIntegrationTests.cs)
+uses the real API and SQL repositories. It covers:
+
+- Missing and invalid API keys across all 13 controller route/method
+  combinations, including the database health endpoint.
+- Database health success with a valid API key.
+- Event insertion, retrieval, filtered querying, and SQL-backed pagination.
+- Both integrity verification routes and direct database payload tampering.
+- Retention updates, preservation of current records, and repeat-run
+  idempotency.
+- Redaction preview/application, persisted payload replacement and hash
+  metadata, duplicate rejection, and integrity verification of redacted data.
+- Filtered JSON/CSV/bundle exports and independent recomputation of the bundle
+  hash-only chain proof.
+- Account-scoped compliance reporting with SQL-backed date filtering and
+  pagination.
+
+The engineer also confirmed that migrations `001`–`004` are applied to the
+target database and that Scenarios A, B, and C, API-key access, retention,
+redaction, export, and database tampering detection have been validated
+against SQL Server. This is recorded as engineer-confirmed validation; no
+separate target-database run log was supplied.
+
+## Recorded coverage collection
+
+The percentages below are from the earlier **132-test** coverage run, before
+the SQL Server integration tests were added. Coverage has not yet been
+re-collected for the latest 143-test run; these figures therefore do not
+include the new SQL integration test execution.
 
 | Assembly | Line coverage | Branch coverage |
 |---|---:|---:|
@@ -23,23 +77,24 @@ Coverage across all instrumented project assemblies:
 | AuditLog.BLL | 99.69% | 96.87% |
 | AuditLog.DAL | 3.23% | 0.87% |
 
-The API assembly total includes source-generated OpenAPI code and application
-startup/registration code. Domain controller actions, API-key authentication,
-and validation paths have focused tests; the database health endpoint's
-unavailable-database response is tested.
+Coverage command:
 
-The BLL services have near-complete line and branch coverage. The DAL contains
-SQL Server repository implementations that are not exercised by these
-in-memory unit tests. SQL-backed repository and healthy-database integration
-tests remain necessary before considering DAL coverage representative.
+```powershell
+dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj --collect:"XPlat Code Coverage"
+```
 
-## Covered behaviors
+The API assembly total includes source-generated OpenAPI and application
+startup/registration code. SQL-backed repository behavior is now exercised by
+the integration suite, but a new coverage collection is needed to measure its
+effect on the DAL percentages.
 
-- Scenario A: event creation/query action results, query validation, hashing,
-  integrity success and tamper/error paths.
-- Scenario B: retention configuration, redaction validation and failures,
-  export formats/filter validation, and bundle construction.
-- Scenario C: compliance report mapping, validation, and API-key enforcement.
-- Domain API controllers: success and mapped error results; required-field and
-  pagination validation; unauthorized requests on protected routes.
+## Remaining limitations
 
+- The integration suite does not stress concurrent database writers.
+- The database health endpoint's unavailable-database response is covered by
+  the existing request tests; the healthy SQL Server response is covered by
+  the integration suite.
+- The export proof is recomputed in tests, but bundles are not digitally
+  signed or externally anchored.
+- Shared API-key authentication does not provide per-user identity,
+  account-level authorization, or separate read/write permissions.

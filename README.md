@@ -158,7 +158,9 @@ Implemented functionality:
 - AuditIntegrityRepository
 - AuditEventQueryService
 
-**Status:** Core implementation completed; final validation pending.
+**Status:** Core implementation and SQL Server validation are complete,
+including integration tests and engineer-reported target-database checks.
+Concurrent-writer stress testing remains pending.
 
 ### Scenario B – Retention, Redaction and Export
 
@@ -192,8 +194,10 @@ Implemented functionality:
 - AuditRedactionRepository
 - AuditExportRepository
 
-**Status:** Retention, redaction, and export APIs are implemented; SQL-backed
-end-to-end validation and independent bundle verification remain pending.
+**Status:** Retention, redaction, and export APIs are implemented and covered
+by SQL Server integration tests, including bundle-proof recomputation.
+External signing or anchoring of bundles and production deployment validation
+remain pending.
 
 ### Scenario C – Compliance Reporting
 
@@ -213,9 +217,10 @@ Implemented functionality:
 - Reuses the existing audit-event table and query repository; no new DB
   migration is required.
 
-**Status:** Implemented for the local assessment; SQL-backed end-to-end
-validation remains pending. The shared API key is not a production substitute
-for an identity provider or regulator-specific account authorization.
+**Status:** Implemented for the local assessment and exercised by SQL Server
+integration tests; the engineer also confirmed validation against the target
+SQL Server database. The shared API key is not a production substitute for an
+identity provider or regulator-specific account authorization.
 
 ## 5. Database Design
 
@@ -360,7 +365,8 @@ Example working endpoint:
 GET /api/audit-events/1?id=1
 ```
 
-The remaining endpoint routes should be verified against the actual controller attributes.
+The current controller routes are covered by the authorization tests; see
+[Test-Coverage.md](docs/Test-Coverage.md) for the verified test results.
 
 ## 8. Testing Strategy
 
@@ -376,18 +382,42 @@ The remaining endpoint routes should be verified against the actual controller a
 
 ### API Request Testing
 - HTTP-level authorization and request-model validation using the test server.
-- Missing and invalid API keys across the Scenario A, B, and C endpoints.
+- Missing and invalid API keys across the Scenario A, B, and C endpoints,
+  including database health.
 - Database-health failure response when SQL Server is unavailable.
 
-### Security Testing
-- Verify audit records cannot be modified through the API.
-- Verify audit records cannot be deleted through the API.
-- Validate hash-chain tampering detection.
-- Verify unauthorized access handling.
-- Verify Scenario A, B, and C API requests require a valid API key.
+### SQL Server Integration Testing
 
-The latest verified test and coverage results, including the remaining
-SQL-backed validation gaps, are documented in
+The opt-in integration suite exercises the API against SQL Server, including
+API-key authorization, database queries, retention, redaction, exports,
+compliance reports, health checks, and tampering detection. The admin
+connection uses `master` only for database setup. The suite creates a temporary
+database named `AuditLogIntegration_<id>`, applies scripts `001`–`004`, runs the
+tests against it, then drops it. The application's `AuditLogDB` is not used or
+modified. Use a dedicated test SQL Server instance, not a production or shared
+development instance.
+
+For LocalDB on Windows:
+
+```powershell
+$env:AUDITLOG_RUN_SQLSERVER_INTEGRATION_TESTS = "true"
+$env:AUDITLOG_SQLSERVER_ADMIN_CONNECTION_STRING = "Server=(localdb)\MSSQLLocalDB;Database=master;Trusted_Connection=True;TrustServerCertificate=True;Encrypt=False"
+dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj
+```
+
+The admin connection must connect to `master` and have permission to create
+and drop databases. Without both environment variables, the 10 SQL Server
+integration tests are skipped. The latest full run with integration enabled
+passed all 143 tests; see [Test-Coverage.md](docs/Test-Coverage.md) for details.
+
+### Security Testing
+- SQL database tampering detection is covered by hash-chain integration tests.
+- Missing and invalid API keys are rejected across all 13 current
+  route/method combinations, including database health.
+- The engineer confirmed unauthorized requests are rejected and every
+  controller endpoint requires a valid API key.
+
+The latest verified test and coverage results are documented in
 [Test-Coverage.md](docs/Test-Coverage.md).
 
 ## 9. AI-Assisted Engineering Approach
@@ -438,28 +468,27 @@ Azure deployment is planned and has not yet been completed.
 
 ## 12. Known Limitations
 
-The following areas require further implementation or validation:
+The following areas remain limitations or require further validation:
 
-- SQL-backed end-to-end validation for audit queries, retention, redaction,
-  export, and compliance reports.
-- Independent verification of exported bundles; the prototype does not sign or
-  externally anchor bundle chain tips.
+- The shared API key does not identify individual users or enforce
+  account-level authorization; production requires an identity provider and
+  least-privilege policies.
+- The prototype does not digitally sign or externally anchor export bundle
+  chain tips.
 - Redaction does not erase values from historical SQL backups or transaction
   logs.
-- Automated integration tests.
-- Individual regulator identity, account-level authorization, and OIDC/JWT
-  integration for compliance reports.
+- Concurrent database-writer stress testing.
 - Production Azure deployment.
 
 ## 13. Project Status
 
 | Scenario | Status |
 |---|---|
-| Scenario A – Core Audit Logging | Implemented; SQL end-to-end validation pending |
-| Scenario B – Retention, Redaction and Export | Implemented; SQL end-to-end validation pending |
-| Scenario C – Compliance Reporting | Implemented; SQL end-to-end validation pending |
+| Scenario A – Core Audit Logging | Implemented; SQL Server integration tests passed |
+| Scenario B – Retention, Redaction and Export | Implemented; SQL Server integration tests passed |
+| Scenario C – Compliance Reporting | Implemented; SQL Server integration tests passed |
 | Architecture Documentation | Prepared |
-| Automated Testing | Unit tests implemented; SQL integration pending |
+| Automated Testing | Unit and SQL Server integration tests; latest full run: 143 passed |
 | Azure Deployment | Planned |
 
 ## 14. Author and Ownership
