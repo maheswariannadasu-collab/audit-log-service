@@ -15,8 +15,8 @@ account and date range, and limit report access to authorized users.
 - Report date filters are optional; when supplied, `fromUtc` is inclusive and
   `toUtc` is exclusive.
 - This local assessment has no configured identity provider. A configuration-
-  supplied API key protects the report endpoint; production should use the
-  organization's OIDC/JWT identity provider and user-level authorization.
+  supplied API key protects the Scenario A, B, and C API endpoints; production
+  should use the organization's identity provider and user-level authorization.
 
 ## Implementation
 
@@ -33,7 +33,7 @@ first). An account with no matching audit events returns an empty page.
 
 ### Access control
 
-Only the compliance report controller requires authentication. Callers must
+All Scenario A, B, and C API controllers require authentication. Callers must
 provide the `X-Compliance-Api-Key` header. The key is read from the
 `ComplianceReporting:ApiKey` configuration value. For local Visual Studio
 development, store it with User Secrets:
@@ -102,7 +102,9 @@ and date-range handling, and API-key acceptance/rejection behavior.
 ## Remaining production considerations
 
 The API key is intentionally a small local-assessment access gate, not a
-replacement for an identity provider. Production deployment should use
-OIDC/JWT, assign regulator-specific roles and account scopes, store secrets in
-a secret manager, and audit report access by the authenticated user. SQL
-Server-backed end-to-end testing is still required for the completed scenarios.
+replacement for an identity provider. The shared key also grants access to
+Scenario A and B operations, including writes, retention, and redaction.
+Production deployment should use an identity provider, assign least-privilege
+roles and account scopes, store secrets in a secret manager, and audit report
+access by the authenticated user. SQL Server-backed end-to-end testing is still
+required for the completed scenarios.

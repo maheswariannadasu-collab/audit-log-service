@@ -52,14 +52,10 @@ The application follows a layered architecture with separate controllers for dif
                       v
                 AuditLog.API
                       |
-       +--------------+------------------------------+
-       |                                             |
-       v                                             v
- Audit, Retention, Redaction, Export,       Compliance Reports Controller
- and Integrity Controllers                   [API-key policy]
-       |                                             |
-       +----------------------+----------------------+
-                              |
+                      v
+       Scenario A, B, and C API Controllers
+              [shared API-key policy]
+                      |
                       v
                  AuditLog.BLL
               Business Services
@@ -212,8 +208,8 @@ Implemented functionality:
   pagination.
 - Returns the actor, event type, account, timestamp, and stored payload, using
   the existing redaction-aware query path.
-- Protects this report endpoint with a configuration-backed
-  `X-Compliance-Api-Key`; the key is not stored in source control.
+- Protects Scenario A, B, and C API endpoints with a shared configuration-
+  backed `X-Compliance-Api-Key`; the key is not stored in source control.
 - Reuses the existing audit-event table and query repository; no new DB
   migration is required.
 
@@ -321,15 +317,15 @@ Update the connection string in `AuditLog.API/appsettings.json`.
 
 Replace the server name with your SQL Server instance.
 
-Set a local compliance-report API key before starting the API. Use a random
-value of at least 32 characters and keep it out of source control:
+Set a local API key before starting the API. Use a random value of at least 32
+characters and keep it out of source control:
 
 ```powershell
 $env:ComplianceReporting__ApiKey = "<your-local-random-key-of-32-or-more-characters>"
 ```
 
-Send it in the `X-Compliance-Api-Key` header when calling the compliance report
-endpoint. Missing or invalid keys receive HTTP 401.
+Send it in the `X-Compliance-Api-Key` header for Scenario A, B, and C API
+requests. Missing or invalid keys receive HTTP 401.
 
 ### Step 5 – Build Solution
 
@@ -390,7 +386,7 @@ The remaining endpoint routes should be verified against the actual controller a
 - Verify audit records cannot be deleted through the API.
 - Validate hash-chain tampering detection.
 - Verify unauthorized access handling.
-- Verify compliance-report requests require a valid API key.
+- Verify Scenario A, B, and C API requests require a valid API key.
 
 ## 9. AI-Assisted Engineering Approach
 

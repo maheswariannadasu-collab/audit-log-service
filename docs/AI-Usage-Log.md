@@ -41,3 +41,30 @@ Reason:
 No identity provider was configured for the local project. The API key is a
 minimal assessment access gate; it does not provide individual regulator
 identity and is not the recommended production identity solution.
+
+## Task: Protect Scenario A and B API Endpoints
+
+AI Tool: AI coding assistant
+
+Prompt:
+Extend the existing `X-Compliance-Api-Key` authentication to all Scenario A
+and B endpoints, reject unauthorized requests, and preserve the current
+authentication mechanism.
+
+AI Output:
+Applied the existing authorization policy to the Scenario A and B controllers,
+added request-level tests for missing and invalid keys across their routes, and
+updated the related scenario and project documentation. No database changes
+were needed.
+
+Engineer Review:
+The .NET 10 API build succeeded with zero warnings and errors. The full test
+suite passed: 34 tests, including authorization checks for all 11 Scenario A
+and B route mappings.
+
+Status: Implemented and validated in the development workspace
+
+Reason:
+Scenario A and B endpoints had not been protected, while Scenario C already
+used the API-key scheme. The same shared key now gates all three scenarios; it
+does not provide individual identity or separate read/write permissions.

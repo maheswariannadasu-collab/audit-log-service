@@ -17,13 +17,13 @@ application.
 - Scenario B: retention, redaction, and filtered export are implemented. The
   redacted-content-hash migration must be applied to the target database.
 - Scenario C: account-scoped, date-filterable compliance reporting is
-  implemented and protected by a configuration-supplied API key for local
-  assessment use.
+  implemented. Scenario A, B, and C API endpoints are protected by a
+  configuration-supplied API key for local assessment use.
 - Unit tests have been run in the development workspace. SQL Server-backed
   end-to-end validation has not been completed.
-- The Scenario C API key is a shared local-assessment credential. It does not
-  provide individual regulator identity or account-level authorization; a
-  production deployment should use the organization's identity provider.
+- The API key is a shared local-assessment credential. It does not provide
+  individual user identity or account-level authorization; a production
+  deployment should use the organization's identity provider.
 
 ## Project-owner confirmation
 

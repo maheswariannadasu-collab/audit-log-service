@@ -13,9 +13,9 @@ The application follows a layered architecture.
 
 Client → API Controller → BLL Service → DAL Repository → SQL Server
 
-The compliance report endpoint follows the same flow and is protected by a
-configuration-backed API-key authentication scheme before the controller is
-invoked.
+Scenario A, B, and C controller endpoints follow the same flow and are
+protected by the configuration-backed API-key authentication scheme before
+their controllers are invoked.
 
 ## Key Design Decisions
 
@@ -39,7 +39,7 @@ invoked.
 - Hash chaining for tamper detection.
 - Separate storage for redacted data.
 - Account and date scoping for compliance reports.
-- Configuration-supplied API key required for the compliance-report route.
+- Configuration-supplied API key required for Scenario A, B, and C API routes.
 - Secrets are supplied through configuration and are not committed.
 - Cancellation support for asynchronous operations.
 

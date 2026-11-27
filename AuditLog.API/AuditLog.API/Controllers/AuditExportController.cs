@@ -1,8 +1,11 @@
-﻿using AuditLog.BLL.Interfaces;
+﻿using AuditLog.API.Auth;
+using AuditLog.BLL.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuditLog.API.Controllers
 {
+    [Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
     [ApiController]
     [Route("api/audit-export")]
     public class AuditExportController : ControllerBase

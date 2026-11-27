@@ -23,6 +23,14 @@ queries, and detect changes to stored events through hash-chain verification.
 | `GET /audit/verify` | Verify the full chain; returns `200` when intact and `409` with the first failure when invalid. |
 | `GET /api/audit-integrity/verify` | Existing verification route retained for compatibility. |
 
+## Access control
+
+All Scenario A endpoints require the existing `X-Compliance-Api-Key` header.
+The key is read from `ComplianceReporting:ApiKey`; configure it using the
+User Secrets or environment-variable instructions in
+[Scenario C](Scenario-C.md#access-control). Requests with a missing or invalid
+key receive HTTP 401.
+
 Query pagination uses `pageNumber` (default `1`) and `pageSize` (default `50`,
 maximum `100`). The response includes `items`, `totalCount`, `pageNumber`, and
 `pageSize`. Invalid page values, overlong filters, and a `fromUtc` value that

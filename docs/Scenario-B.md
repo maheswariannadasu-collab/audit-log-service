@@ -16,6 +16,18 @@ structured payload redaction, and targeted export.
 at least one of `actorId` or `resourceId`. If both are supplied, both filters
 apply.
 
+## Access control
+
+All Scenario B endpoints require the existing `X-Compliance-Api-Key` header,
+using the same `ComplianceReporting:ApiKey` configuration as Scenario A and C.
+See [Scenario C access control](Scenario-C.md#access-control) for local
+configuration instructions. Requests with a missing or invalid key receive
+HTTP 401.
+
+The shared key grants access to all Scenario A, B, and C routes, including
+retention and redaction operations; it does not provide per-user identity or
+separate read/write permissions. Protect it as a privileged secret.
+
 ## Redaction design and trade-offs
 
 For a new redaction, the service:

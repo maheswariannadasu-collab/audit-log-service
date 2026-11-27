@@ -9,6 +9,20 @@ namespace AuditLog.Tests;
 public sealed class AuditIntegrityServiceTests
 {
     [Fact]
+    public async Task VerifyAsync_AcceptsEmptyChain()
+    {
+        var service = new AuditIntegrityService(
+            new InMemoryAuditIntegrityRepository([]),
+            new AuditHashingService());
+
+        var result = await service.VerifyAsync();
+
+        Assert.True(result.IsValid);
+        Assert.Equal(0, result.TotalRecords);
+        Assert.Equal(0, result.VerifiedRecords);
+    }
+
+    [Fact]
     public async Task VerifyAsync_AcceptsIntactChain()
     {
         var records = CreateTwoRecordChain();
@@ -54,6 +68,85 @@ public sealed class AuditIntegrityServiceTests
         Assert.Equal("Content hash mismatch.", result.Message);
         Assert.Equal(2, result.TotalRecords);
         Assert.Equal(0, result.VerifiedRecords);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ReportsPreviousHashMismatch()
+    {
+        var records = CreateTwoRecordChain();
+        records[0] = WithPreviousHash(
+            records[0],
+            [1, .. new byte[31]]);
+        var service = new AuditIntegrityService(
+            new InMemoryAuditIntegrityRepository(records),
+            new AuditHashingService());
+
+        var result = await service.VerifyAsync();
+
+        Assert.False(result.IsValid);
+        Assert.Equal(1, result.FailedRecordId);
+        Assert.Equal("Previous hash mismatch.", result.Message);
+        Assert.Equal(0, result.VerifiedRecords);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ReportsRecordHashMismatch()
+    {
+        var records = CreateTwoRecordChain();
+        var record = records[0];
+        var changedHash = (byte[])record.RecordHash.Clone();
+        changedHash[0] ^= 0xFF;
+        records[0] = WithRecordHash(record, changedHash);
+        var service = new AuditIntegrityService(
+            new InMemoryAuditIntegrityRepository(records),
+            new AuditHashingService());
+
+        var result = await service.VerifyAsync();
+
+        Assert.False(result.IsValid);
+        Assert.Equal(record.Id, result.FailedRecordId);
+        Assert.Equal("Record hash mismatch.", result.Message);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ReportsInvalidPayloadJson()
+    {
+        var records = CreateTwoRecordChain();
+        records[0] = WithPayload(records[0], "{");
+        var service = new AuditIntegrityService(
+            new InMemoryAuditIntegrityRepository(records),
+            new AuditHashingService());
+
+        var result = await service.VerifyAsync();
+
+        Assert.False(result.IsValid);
+        Assert.Equal(records[0].Id, result.FailedRecordId);
+        Assert.Equal("Invalid original payload JSON.", result.Message);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ReportsInvalidHashData()
+    {
+        var records = CreateTwoRecordChain();
+        var first = records[0];
+        var expectedRedactedHash = ComputeContentHash(
+            first,
+            first.PayloadJson);
+        records[0] = WithContentHash(first, new byte[31]);
+        var service = new AuditIntegrityService(
+            new InMemoryAuditIntegrityRepository(
+                records,
+                new Dictionary<long, byte[]>
+                {
+                    [first.Id] = expectedRedactedHash
+                }),
+            new AuditHashingService());
+
+        var result = await service.VerifyAsync();
+
+        Assert.False(result.IsValid);
+        Assert.Equal(first.Id, result.FailedRecordId);
+        Assert.Equal("Invalid hash data.", result.Message);
     }
 
     [Fact]
@@ -104,6 +197,19 @@ public sealed class AuditIntegrityServiceTests
         Assert.False(result.IsValid);
         Assert.Equal(first.Id, result.FailedRecordId);
         Assert.Equal("Redacted content hash mismatch.", result.Message);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_PropagatesCancellation()
+    {
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+        var service = new AuditIntegrityService(
+            new InMemoryAuditIntegrityRepository(CreateTwoRecordChain()),
+            new AuditHashingService());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.VerifyAsync(cancellationSource.Token));
     }
 
     private static List<AuditEventRecord> CreateTwoRecordChain()
@@ -194,6 +300,57 @@ public sealed class AuditIntegrityServiceTests
             PayloadJson = payloadJson,
             EventTimestampUtc = record.EventTimestampUtc,
             ContentHash = record.ContentHash,
+            PreviousHash = record.PreviousHash,
+            RecordHash = record.RecordHash
+        };
+
+    private static AuditEventRecord WithPreviousHash(
+        AuditEventRecord record,
+        byte[] previousHash) =>
+        new()
+        {
+            Id = record.Id,
+            EventType = record.EventType,
+            ActorId = record.ActorId,
+            ResourceType = record.ResourceType,
+            ResourceId = record.ResourceId,
+            PayloadJson = record.PayloadJson,
+            EventTimestampUtc = record.EventTimestampUtc,
+            ContentHash = record.ContentHash,
+            PreviousHash = previousHash,
+            RecordHash = record.RecordHash
+        };
+
+    private static AuditEventRecord WithRecordHash(
+        AuditEventRecord record,
+        byte[] recordHash) =>
+        new()
+        {
+            Id = record.Id,
+            EventType = record.EventType,
+            ActorId = record.ActorId,
+            ResourceType = record.ResourceType,
+            ResourceId = record.ResourceId,
+            PayloadJson = record.PayloadJson,
+            EventTimestampUtc = record.EventTimestampUtc,
+            ContentHash = record.ContentHash,
+            PreviousHash = record.PreviousHash,
+            RecordHash = recordHash
+        };
+
+    private static AuditEventRecord WithContentHash(
+        AuditEventRecord record,
+        byte[] contentHash) =>
+        new()
+        {
+            Id = record.Id,
+            EventType = record.EventType,
+            ActorId = record.ActorId,
+            ResourceType = record.ResourceType,
+            ResourceId = record.ResourceId,
+            PayloadJson = record.PayloadJson,
+            EventTimestampUtc = record.EventTimestampUtc,
+            ContentHash = contentHash,
             PreviousHash = record.PreviousHash,
             RecordHash = record.RecordHash
         };

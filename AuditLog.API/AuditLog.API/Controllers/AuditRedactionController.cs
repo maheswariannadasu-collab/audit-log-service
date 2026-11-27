@@ -1,5 +1,7 @@
-﻿using AuditLog.BLL.Interfaces;
+﻿using AuditLog.API.Auth;
+using AuditLog.BLL.Interfaces;
 using AuditLog.BLL.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -7,6 +9,7 @@ using System.Text.Json;
 namespace AuditLog.API.Controllers
 {
 
+    [Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
     [ApiController]
     [Route("api/audit-redaction")]
     public class AuditRedactionController : ControllerBase
