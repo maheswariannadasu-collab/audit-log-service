@@ -7,40 +7,208 @@ change; they do not prove that AI authored every line in those files.
 
 ## Evidence and attribution
 
-- The initial user statement was that the project, APIs, and database schema
-  already existed. Earlier setup commits are therefore treated as project
-  baseline unless an AI contribution is specifically recorded below.
+- The developer confirms that the initial project setup, existing APIs, and
+  database schema were implemented manually by the developer with guidance and
+  suggestions from ChatGPT. ChatGPT's role was advisory; it did not implement
+  the initial project, APIs, or schema.
+- The developer confirms subsequent development changes were made with
+  GitHub Copilot assistance. The entries below distinguish that assistance
+  from developer decisions, modifications, and validation.
 - Git commits are authored by `Uma`; commit authorship alone does not establish
   whether code was AI-generated or developer-written.
 - Test/build outcomes are labeled as assistant-run, repository-recorded, or
   developer-reported. Missing task-specific evidence is stated rather than
   inferred.
-- Commit references below were reviewed through `cbbb4f2` (`HEAD` at the time
-  of this update).
+- The full commit-history audit in Task 14 covers all commits from `d1f18a1`
+  through `ead40b3` (`HEAD` on 2026-11-27).
+
+## Repository baseline and attribution boundary
+
+The initial project scaffold and implementation commits include
+`d1f18a1`, `46e1775`, `a55e3d7`, `039de50`, and `5fa30f5`. They contain the
+solution setup, initial audit-event API, database script, and earlier
+Scenario A/B work. The developer confirms the initial setup, existing APIs,
+and database schema were manually implemented with ChatGPT guidance. Later
+development changes were assisted by GitHub Copilot and are described in the
+chronological entries below. Commit contents alone are not used to attribute
+other work to AI.
 
 ## Chronological task record
 
+Task 1 records ChatGPT's architecture guidance during the initial project
+phase. Subsequent development entries record GitHub Copilot assistance and
+separately identify developer decisions and validation.
+
 ### 1. Project architecture advice
 
-**Date / commit:** Initial project history; recorded in `d1f18a1` (2026-11-25).
+**Date / commit:** 2026-11-25; `d1f18a1` — Initial project setup.
 
 **AI tool:** ChatGPT, as recorded in the original log.
 
 **Prompt (verbatim from the original log):** “Suggest a maintainable
 architecture for an audit log service.”
 
-**AI contribution:** Suggested API, BLL, DAL, and database layers.
+**AI contribution:** Suggested API, BLL, DAL, and database layers as
+architecture advice. This did not create or implement the already completed
+project setup, APIs, or database schema.
 
 **Engineer decision:** Accepted the layered approach with modifications to
-keep the assignment implementation simple.
+keep the assignment implementation simple. The developer implemented the
+initial project, APIs, and schema manually, informed by this guidance.
 
-**Files / commit evidence:** `docs/AI-Usage-Log.md` and `docs/Architecture.md`
-were added in the initial project commit. The commit also created the initial
-repository scaffold, but the available record does not attribute those source
-files individually to AI.
+**Files changed in `d1f18a1`:**
+
+- `.gitignore`
+- `ATTESTATION.md`
+- `AuditLog.API/AuditLog.API/AuditLog.API.csproj`
+- `AuditLog.API/AuditLog.API/AuditLog.API.csproj.user`
+- `AuditLog.API/AuditLog.API/AuditLog.API.http`
+- `AuditLog.API/AuditLog.API/Program.cs`
+- `AuditLog.API/AuditLog.API/Properties/launchSettings.json`
+- `AuditLog.API/AuditLog.API/appsettings.Development.json`
+- `AuditLog.API/AuditLog.API/appsettings.json`
+- `AuditLog.BLL/AuditLog.BLL/AuditLog.BLL.csproj`
+- `AuditLog.BLL/AuditLog.BLL/Class1.cs`
+- `AuditLog.DAL/AuditLog.DAL/AuditLog.DAL.csproj`
+- `AuditLog.DAL/AuditLog.DAL/Class1.cs`
+- `AuditLog.Tests/AuditLog.Tests/AuditLog.Tests.csproj`
+- `AuditLog.Tests/AuditLog.Tests/UnitTest1.cs`
+- `AuditLogService.slnx`
+- `README.md`
+- `docs/AI-Usage-Log.md`
+- `docs/Architecture.md`
+- `docs/Scenario-A.md`
+- `docs/Scenario-B.md`
+- `docs/Scenario-C.md`
+
+The developer confirms that the initial setup, APIs, and schema were
+implemented manually with ChatGPT guidance; this commit's file list does not
+mean ChatGPT authored the implementation.
 
 **Validation:** No build or test result is recorded for this architecture
 advice.
+
+### Initial implementation commits identified in the history audit
+
+The following commits were present in Git history but did not have individual
+commit records in the prior log. The initial API and schema implementation is
+attributed to the developer, with ChatGPT guidance, based on the developer's
+confirmation. No line-by-line AI authorship is inferred.
+
+#### Commit `46e1775` — Initial audit log service project setup
+
+**Date:** 2026-11-25.
+
+**Purpose:** Add the first audit-log service components, database connection
+setup, and migration `001`.
+
+**Attribution:** Developer-performed initial implementation with ChatGPT
+guidance; no claim that ChatGPT authored the source files.
+
+**Files changed:**
+
+- `AuditLog.API/AuditLog.API/AuditLog.API.csproj.user`
+- `AuditLog.API/AuditLog.API/AuditLog.API.http` (deleted)
+- `AuditLog.API/AuditLog.API/Controllers/HealthController.cs`
+- `AuditLog.API/AuditLog.API/Program.cs`
+- `AuditLog.API/AuditLog.API/appsettings.json`
+- `AuditLog.BLL/AuditLog.BLL/Models/AuditEventData.cs`
+- `AuditLog.BLL/AuditLog.BLL/Services/AuditHashingService.cs`
+- `AuditLog.DAL/AuditLog.DAL/AuditLog.DAL.csproj`
+- `AuditLog.DAL/AuditLog.DAL/Data/SqlConnectionFactory.cs`
+- `database/Scripts/001_CreateAuditEvents.sql`
+- `docs/AI-Usage-Log.md`
+
+#### Commit `a55e3d7` — Implement audit event write API
+
+**Date:** 2026-11-26.
+
+**Purpose:** Implement the API path for writing audit events.
+
+**Attribution:** Developer-performed API implementation with ChatGPT
+guidance, consistent with the developer's account of the initial APIs.
+
+**Files changed:**
+
+- `AuditLog.API/AuditLog.API/AuditLog.API.csproj`
+- `AuditLog.API/AuditLog.API/Controllers/AuditEventsController.cs`
+- `AuditLog.API/AuditLog.API/DTOs/CreateAuditEventRequest.cs`
+- `AuditLog.API/AuditLog.API/DTOs/CreateAuditEventResponse.cs`
+- `AuditLog.API/AuditLog.API/Program.cs`
+- `AuditLog.BLL/AuditLog.BLL/AuditLog.BLL.csproj`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditEventRepository.cs`
+- `AuditLog.BLL/AuditLog.BLL/Services/AuditEventWriterService.cs`
+- `AuditLog.DAL/AuditLog.DAL/AuditLog.DAL.csproj`
+- `AuditLog.DAL/AuditLog.DAL/Repositories/AuditEventRepository.cs`
+
+#### Commit `039de50` — Implement retention, redaction, export, and integrity
+
+**Date:** 2026-11-26.
+
+**Purpose:** Add the initial retention, redaction, export, and integrity APIs,
+services, repositories, and database scripts `002` and `003`.
+
+**Attribution:** Developer-performed initial API and schema implementation
+with ChatGPT guidance. No specific AI-authored files are asserted.
+
+**Files changed:**
+
+- `AuditLog.API/AuditLog.API/Controllers/AuditEventsController.cs`
+- `AuditLog.API/AuditLog.API/Controllers/AuditExportController.cs`
+- `AuditLog.API/AuditLog.API/Controllers/AuditIntegrityController.cs`
+- `AuditLog.API/AuditLog.API/Controllers/AuditRedactionController.cs`
+- `AuditLog.API/AuditLog.API/Controllers/AuditRetentionController.cs`
+- `AuditLog.API/AuditLog.API/DTOs/AuditEventResponse.cs`
+- `AuditLog.API/AuditLog.API/Program.cs`
+- `AuditLog.API/AuditLog.API/appsettings.json`
+- `AuditLog.BLL/AuditLog.BLL/AuditLog.BLL.csproj`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditEventRepository.cs`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditExportRepository.cs`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditExportService.cs`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditIntegrityRepository.cs`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditIntegrityService.cs`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditRedactionRepository.cs`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditRedactionService.cs`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditRetentionRepository.cs`
+- `AuditLog.BLL/AuditLog.BLL/Interfaces/IAuditRetentionService.cs`
+- `AuditLog.BLL/AuditLog.BLL/Models/AuditEventRecord.cs`
+- `AuditLog.BLL/AuditLog.BLL/Models/AuditExport.cs`
+- `AuditLog.BLL/AuditLog.BLL/Models/AuditIntegrityResult.cs`
+- `AuditLog.BLL/AuditLog.BLL/Models/AuditRedactionOptions.cs`
+- `AuditLog.BLL/AuditLog.BLL/Models/AuditRedactionRequest.cs`
+- `AuditLog.BLL/AuditLog.BLL/Models/AuditRedactionResult.cs`
+- `AuditLog.BLL/AuditLog.BLL/Models/AuditRetentionOptions.cs`
+- `AuditLog.BLL/AuditLog.BLL/Services/AuditEventQueryService.cs`
+- `AuditLog.BLL/AuditLog.BLL/Services/AuditExportService.cs`
+- `AuditLog.BLL/AuditLog.BLL/Services/AuditIntegrityService.cs`
+- `AuditLog.BLL/AuditLog.BLL/Services/AuditRedactionService.cs`
+- `AuditLog.BLL/AuditLog.BLL/Services/AuditRetentionService.cs`
+- `AuditLog.DAL/AuditLog.DAL/Repositories/AuditEventRepository.cs`
+- `AuditLog.DAL/AuditLog.DAL/Repositories/AuditExportRepository.cs`
+- `AuditLog.DAL/AuditLog.DAL/Repositories/AuditIntegrityRepository.cs`
+- `AuditLog.DAL/AuditLog.DAL/Repositories/AuditRedactionRepository.cs`
+- `AuditLog.DAL/AuditLog.DAL/Repositories/AuditRetentionRepository.cs`
+- `database/Scripts/002_AddAuditRetentionColumns.sql`
+- `database/Scripts/003_CreateAuditEventRedactions.sql`
+
+#### Commit `5fa30f5` — Update project documentation
+
+**Date:** 2026-11-26.
+
+**Purpose:** Update the README, architecture, and scenario documentation.
+
+**Attribution:** Commit metadata records the documentation changes but does
+not identify specific AI contributions to individual files. The developer
+confirms subsequent changes were assisted by GitHub Copilot, but no
+file-specific Copilot contribution is claimed for this commit.
+
+**Files changed:**
+
+- `README.md`
+- `docs/Architecture.md`
+- `docs/Scenario-A.md`
+- `docs/Scenario-B.md`
+- `docs/Scenario-C.md`
 
 ### 2. Assessment coverage review and completion planning
 
@@ -346,8 +514,7 @@ attestation's 18 relative links were checked. No tests were rerun.
 
 ### 10. AI usage log consolidation
 
-**Date / commit:** 2026-11-27; this update is not committed at the time of
-writing.
+**Date / commit:** 2026-11-27; `00df2fa`.
 
 **Task request summary:** Review repository files, recent Git history, tests,
 documentation, and implementation tasks, then produce a task-wise AI usage
@@ -358,7 +525,7 @@ scenario documents, test and coverage evidence, and recorded task history.
 Separated documented AI contributions from baseline implementation whose
 authorship cannot be established from Git.
 
-**Files changed:** `docs/AI-Usage-Log.md`.
+**Files changed in `00df2fa`:** `docs/AI-Usage-Log.md`.
 
 **Validation:** Documentation-only. The relative link resolves and
 `git diff --check` passed. No application tests were run.
@@ -384,21 +551,9 @@ test counts were supplied with the confirmation. It is recorded as
 engineer-reported validation, not as a newly executed or independently
 reproduced test run.
 
-## Repository baseline and attribution boundary
-
-The initial project scaffold and implementation commits include
-`d1f18a1`, `46e1775`, `a55e3d7`, `039de50`, and `5fa30f5`. They contain the
-solution setup, initial audit-event API and database script, and earlier
-Scenario A/B and documentation work. The user stated that the project, APIs,
-and database schema were already in progress before requesting the coverage
-review. Apart from the architecture recommendation documented above, the
-available AI-usage and session records do not reliably attribute individual
-files in those baseline commits to AI. They are therefore not described here
-as AI-generated.
-
 ### 12. Protect database health and add SQL Server integration tests
 
-**Date / commit:** 2026-11-27; no commit at the time of this update.
+**Date / commit:** 2026-11-27; `f80ad85`.
 
 **Task request summary:** Add real SQL Server integration coverage for
 Scenarios A, B, and C, including API-key authorization, database operations,
@@ -462,21 +617,49 @@ and externally signed or anchored export bundles remain limitations.
 
 ### 13. Record engineer-confirmed API-key authorization validation
 
-**Date / commit:** 2026-11-27; no commit at the time of this update.
+**Date / commit:** 2026-11-27; the authorization-status documentation was
+included in `f80ad85`; the subsequent log update was committed as `ead40b3`.
 
 **Engineer confirmation:** Unauthorized-access handling was validated and is
 working. Every controller endpoint, including database health, requires a
 valid API key.
 
-**AI contribution:** Updated the README security-testing status to distinguish
-the engineer-confirmed validation from the previously recorded automated
-authorization and SQL Server integration-test results.
+**AI contribution:** Recorded the engineer confirmation separately from the
+automated authorization and SQL Server integration-test results. The README
+security-testing update is part of `f80ad85`; this log update is part of
+`ead40b3`.
 
-**Files changed:** `README.md` and `docs/AI-Usage-Log.md`.
+**Files changed in `ead40b3`:** `docs/AI-Usage-Log.md`.
 
 **Evidence limits:** No additional test command, run log, or test count was
 provided with this confirmation. It is recorded as engineer-reported
 validation; the earlier automated test results remain separately documented.
+
+### 14. Reconcile the complete Git commit history
+
+**Date / commit:** 2026-11-27; this documentation update is uncommitted at the
+time of writing.
+
+**Task request summary:** Compare every commit from the initial commit through
+current `HEAD` with this log, add missing relevant commit records in
+chronological order, and avoid unsupported AI attribution.
+
+**AI contribution:** Compared the chronological Git log and each commit's
+changed-file list with the existing task records. Added records for the
+previously unitemized initial implementation and documentation commits, and
+updated the existing log entries with the actual commits that recorded the
+history, health authorization, and SQL Server integration work.
+
+**Attribution:** The developer's clarification is recorded as the source for
+manual initial implementation with ChatGPT guidance and subsequent
+GitHub Copilot-assisted changes. No commit-specific AI authorship is claimed
+where the history provides no further evidence.
+
+**Files changed:** `docs/AI-Usage-Log.md`.
+
+**Validation:** Reviewed all **14 commits** from `d1f18a1` through `ead40b3`,
+including commit dates, subjects, and changed paths. `git diff --check`
+passed. No application tests were run for this documentation-only update.
 
 ## Current pending validation
 
