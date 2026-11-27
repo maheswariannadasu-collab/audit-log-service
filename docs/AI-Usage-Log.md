@@ -396,7 +396,7 @@ available AI-usage and session records do not reliably attribute individual
 files in those baseline commits to AI. They are therefore not described here
 as AI-generated.
 
-### 12. SQL Server integration tests for all API scenarios
+### 12. Protect database health and add SQL Server integration tests
 
 **Date / commit:** 2026-11-27; no commit at the time of this update.
 
@@ -405,24 +405,32 @@ Scenarios A, B, and C, including API-key authorization, database operations,
 retention, redaction, export, and tampering detection; execute the suite and
 record actual results.
 
-**AI contribution:** Added an opt-in test fixture that creates a unique
-disposable SQL Server database, applies migrations `001`–`004`, uses the real
-API and repository implementations, and drops the test database at teardown.
-Added integration cases for all controller routes, successful health checks,
-event persistence/query pagination, both integrity routes, retention,
-redaction persistence and hash metadata, exports and proof recomputation,
-compliance report filtering/pagination, and raw SQL payload tampering.
+**AI contribution:** Added
+`[Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]` to
+`HealthController`, reusing the existing API-key authentication policy. Updated
+the health authorization test and unauthorized-route coverage so database
+health is included.
+
+Added an opt-in SQL Server integration fixture that exercises the real API and
+repositories against a unique temporary database, applies migrations
+`001`–`004`, and drops the database at teardown. Added cases for all controller
+routes, successful health checks, event persistence/query pagination, both
+integrity routes, retention, redaction persistence and hash metadata, exports
+and proof recomputation, compliance report filtering/pagination, and raw SQL
+payload tampering.
 
 The route-authentication matrix covers all 13 controller route/method
-combinations with missing and invalid keys. Source inspection found the
-database health controller lacked the shared authorization policy; the policy
-was applied there and its unavailable-database test now sends a valid key.
+combinations with missing and invalid keys. The unavailable-database health
+test sends a valid key so it verifies the database failure response rather
+than being rejected by authorization.
 
 **Engineer decisions:** The suite requires explicit opt-in and an admin
-connection string to `master` on a dedicated test instance. The fixture uses
-an isolated generated database name and does not use or drop the application's
-configured `AuditLogDb`. The test database was confirmed removed after the
-run.
+connection string to `master` on a dedicated test instance. `master` is used
+only for database setup; tests run against a generated
+`AuditLogIntegration_<id>` database. The fixture does not use or modify the
+application's `AuditLogDB`. The test database was confirmed removed after the
+run. Integration tests require `AUDITLOG_RUN_SQLSERVER_INTEGRATION_TESTS=true`
+and `AUDITLOG_SQLSERVER_ADMIN_CONNECTION_STRING` to be set.
 
 **Files changed:**
 
