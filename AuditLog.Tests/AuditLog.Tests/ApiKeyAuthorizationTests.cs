@@ -1,7 +1,9 @@
 using System.Net;
+using System.Text;
 using AuditLog.API.Auth;
 using AuditLog.BLL.Interfaces;
 using AuditLog.BLL.Models;
+using AuditLog.DAL.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -15,10 +17,12 @@ public sealed class ApiKeyAuthorizationTests
     : IClassFixture<ApiKeyAuthorizationApiFactory>
 {
     private readonly HttpClient _client;
+    private readonly ApiKeyAuthorizationApiFactory _factory;
 
     public ApiKeyAuthorizationTests(
         ApiKeyAuthorizationApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -47,6 +51,24 @@ public sealed class ApiKeyAuthorizationTests
     }
 
     [Fact]
+    public async Task GetAccountAccessReport_WithMultipleApiKeys_ReturnsUnauthorized()
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/compliance-reports/accounts/ACCOUNT100/access");
+        request.Headers.Add(
+            ComplianceApiKeyDefaults.HeaderName,
+            [
+                ApiKeyAuthorizationApiFactory.ConfiguredKey,
+                ApiKeyAuthorizationApiFactory.ConfiguredKey
+            ]);
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetAccountAccessReport_WithValidApiKey_IsAuthorized()
     {
         using var request = new HttpRequestMessage(
@@ -59,6 +81,90 @@ public sealed class ApiKeyAuthorizationTests
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AuditEventCreate_WithMissingRequiredFields_ReturnsBadRequest()
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/audit-events")
+        {
+            Content = new StringContent(
+                "{}",
+                Encoding.UTF8,
+                "application/json")
+        };
+        request.Headers.Add(
+            ComplianceApiKeyDefaults.HeaderName,
+            ApiKeyAuthorizationApiFactory.ConfiguredKey);
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AuditEventQuery_WithInvalidPagination_ReturnsBadRequest()
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/audit-events?pageNumber=0");
+        request.Headers.Add(
+            ComplianceApiKeyDefaults.HeaderName,
+            ApiKeyAuthorizationApiFactory.ConfiguredKey);
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ComplianceReport_WithInvalidAccountOrPagination_ReturnsBadRequest()
+    {
+        var overlongAccountId = new string('A', 151);
+        using var invalidAccountRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/compliance-reports/accounts/{overlongAccountId}/access");
+        invalidAccountRequest.Headers.Add(
+            ComplianceApiKeyDefaults.HeaderName,
+            ApiKeyAuthorizationApiFactory.ConfiguredKey);
+
+        using var invalidAccountResponse =
+            await _client.SendAsync(invalidAccountRequest);
+
+        Assert.Equal(HttpStatusCode.BadRequest, invalidAccountResponse.StatusCode);
+
+        using var invalidPaginationRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/compliance-reports/accounts/ACCOUNT100/access?pageSize=101");
+        invalidPaginationRequest.Headers.Add(
+            ComplianceApiKeyDefaults.HeaderName,
+            ApiKeyAuthorizationApiFactory.ConfiguredKey);
+
+        using var invalidPaginationResponse =
+            await _client.SendAsync(invalidPaginationRequest);
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            invalidPaginationResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task DatabaseHealth_WhenDatabaseUnavailable_ReturnsServiceUnavailable()
+    {
+        Assert.Equal(
+            "Server=127.0.0.1,1;Connect Timeout=1;Encrypt=False;TrustServerCertificate=True",
+            _factory.Services
+                .GetRequiredService<IConfiguration>()
+                .GetConnectionString("AuditLogDb"));
+
+        using var response = await _client.GetAsync("/api/health/database");
+
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.ServiceUnavailable,
+            $"Expected 503 but got {(int)response.StatusCode}: {responseBody}");
     }
 
     [Theory]
@@ -113,7 +219,7 @@ public sealed class ApiKeyAuthorizationApiFactory
                 new Dictionary<string, string?>
                 {
                     ["ConnectionStrings:AuditLogDb"] =
-                        "Server=localhost;Database=AuditLogTests;Integrated Security=true;TrustServerCertificate=true",
+                        "Server=127.0.0.1,1;Connect Timeout=1;Encrypt=False;TrustServerCertificate=True",
                     ["ComplianceReporting:ApiKey"] =
                         ConfiguredKey
                 });
@@ -121,6 +227,9 @@ public sealed class ApiKeyAuthorizationApiFactory
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<SqlConnectionFactory>();
+            services.AddSingleton(new SqlConnectionFactory(
+                "Server=127.0.0.1,1;Connect Timeout=1;Encrypt=False;TrustServerCertificate=True"));
             services.RemoveAll<IComplianceReportService>();
             services.AddSingleton<
                 IComplianceReportService,

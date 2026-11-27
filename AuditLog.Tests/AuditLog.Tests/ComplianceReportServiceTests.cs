@@ -7,6 +7,16 @@ namespace AuditLog.Tests;
 public sealed class ComplianceReportServiceTests
 {
     [Fact]
+    public async Task GetAccountAccessReportAsync_RejectsNullQuery()
+    {
+        var service = new ComplianceReportService(
+            new AuditEventQueryService(new RecordingAuditEventRepository()));
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            service.GetAccountAccessReportAsync(null!));
+    }
+
+    [Fact]
     public async Task GetAccountAccessReportAsync_FiltersByAccountAndMapsResults()
     {
         var timestamp = DateTime.SpecifyKind(
@@ -77,6 +87,21 @@ public sealed class ComplianceReportServiceTests
     }
 
     [Fact]
+    public async Task GetAccountAccessReportAsync_RejectsOverlongAccountId()
+    {
+        var service = new ComplianceReportService(
+            new AuditEventQueryService(
+                new RecordingAuditEventRepository()));
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.GetAccountAccessReportAsync(
+                new ComplianceAccessReportQuery
+                {
+                    AccountId = new string('A', 151)
+                }));
+    }
+
+    [Fact]
     public async Task GetAccountAccessReportAsync_RejectsInvalidDateRange()
     {
         var service = new ComplianceReportService(
@@ -93,6 +118,36 @@ public sealed class ComplianceReportServiceTests
                     ToUtc = new DateTimeOffset(
                         2026, 11, 1, 0, 0, 0, TimeSpan.Zero)
                 }));
+    }
+
+    [Fact]
+    public async Task GetAccountAccessReportAsync_MapsEmptyPageAndNormalizesDateBounds()
+    {
+        var repository = new RecordingAuditEventRepository();
+        var service = new ComplianceReportService(
+            new AuditEventQueryService(repository));
+        var fromUtc = new DateTimeOffset(
+            2026, 11, 1, 10, 0, 0, TimeSpan.FromHours(2));
+        var toUtc = new DateTimeOffset(
+            2026, 11, 2, 10, 0, 0, TimeSpan.FromHours(2));
+
+        var result = await service.GetAccountAccessReportAsync(
+            new ComplianceAccessReportQuery
+            {
+                AccountId = "ACCOUNT100",
+                FromUtc = fromUtc,
+                ToUtc = toUtc
+            });
+
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(fromUtc.ToUniversalTime(), result.FromUtc);
+        Assert.Equal(toUtc.ToUniversalTime(), result.ToUtc);
+        Assert.Equal("ACCOUNT", repository.ReceivedQuery?.ResourceType);
+        Assert.Equal("ACCOUNT100", repository.ReceivedQuery?.ResourceId);
+        Assert.Equal(1, repository.ReceivedQuery?.PageNumber);
+        Assert.Equal(AuditEventQuery.DefaultPageSize,
+            repository.ReceivedQuery?.PageSize);
     }
 
     private sealed class RecordingAuditEventRepository(

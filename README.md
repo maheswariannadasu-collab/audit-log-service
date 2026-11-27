@@ -371,15 +371,13 @@ The remaining endpoint routes should be verified against the actual controller a
 - Input validation.
 - Integrity verification.
 - Compliance account/date filtering, report projection, and API-key validation.
+- Domain-controller success, validation, and error responses; database-health
+  failure handling.
 
-### Integration Testing
-- Database connectivity.
-- Audit event insertion and retrieval.
-- Filtering and pagination.
-- Concurrent event insertion.
-- Retention processing and archived-record verification.
-- Redaction, duplicate prevention, and live-payload replacement.
-- Targeted export and independent chain-proof verification.
+### API Request Testing
+- HTTP-level authorization and request-model validation using the test server.
+- Missing and invalid API keys across the Scenario A, B, and C endpoints.
+- Database-health failure response when SQL Server is unavailable.
 
 ### Security Testing
 - Verify audit records cannot be modified through the API.
@@ -387,6 +385,10 @@ The remaining endpoint routes should be verified against the actual controller a
 - Validate hash-chain tampering detection.
 - Verify unauthorized access handling.
 - Verify Scenario A, B, and C API requests require a valid API key.
+
+The latest verified test and coverage results, including the remaining
+SQL-backed validation gaps, are documented in
+[Test-Coverage.md](docs/Test-Coverage.md).
 
 ## 9. AI-Assisted Engineering Approach
 
