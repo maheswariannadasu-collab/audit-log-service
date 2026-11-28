@@ -7,7 +7,7 @@ namespace AuditLog.BLL.Interfaces
 {
     public interface IAuditEventRepository
     {
-        Task<long> InsertAsync(
+        Task<AuditEventWriteResult> InsertAsync(
             AuditEventData auditEvent,
             CancellationToken cancellationToken = default);
 

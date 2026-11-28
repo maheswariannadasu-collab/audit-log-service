@@ -697,6 +697,37 @@ passed **139 tests**, 0 failed, 0 skipped. A local API run verified
 `POST /auth/token`, anonymous HTTP 401 for a protected endpoint, and Bearer
 security metadata in `/openapi/v1.json`.
 
+### 16. Idempotency support for audit-event creation
+
+**Date / commit:** 2026-11-28; no commit at the time of this update.
+
+**Task request summary:** Add idempotency support only to
+`POST /api/audit-events`.
+
+**AI contribution:** Added optional `Idempotency-Key` handling and an
+`X-Idempotency-Key` compatibility alias to the audit-event create action.
+Added a subject-scoped idempotency repository transaction, request-hash
+conflict detection, replay response metadata, migration
+`007_CreateAuditEventIdempotency.sql`, and SQL integration coverage for replay
+and conflicting payloads.
+
+**Engineer decisions:** Idempotency is explicit and remains optional. The key
+is scoped to the JWT `sub` claim, and the original audit event ID is replayed
+for identical event content. A reused key with different content returns
+HTTP 409. Other endpoints remain unchanged.
+
+**Files changed:** `AuditEventsController.cs`,
+`AuditEventData.cs`, `AuditEventWriteResult.cs`,
+`IAuditEventRepository.cs`, `AuditEventWriterService.cs`,
+`AuditEventRepository.cs`, `007_CreateAuditEventIdempotency.sql`,
+`ApiControllerTests.cs`, `AuditEventWriterServiceTests.cs`,
+`AuditEventQueryServiceTests.cs`, `ComplianceReportServiceTests.cs`,
+`SqlServerApiIntegrationTests.cs`, `README.md`, and `Scenario-A.md`.
+
+**Validation:** Solution build passed. Default suite passed
+**129 tests**, with **11 SQL Server integration tests skipped**. The SQL
+Server integration filter passed **11 tests**, 0 failed, 0 skipped.
+
 ## Current pending validation
 
 - Concurrent SQL Server writer stress testing.

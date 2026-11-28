@@ -19,7 +19,7 @@ namespace AuditLog.DAL.Repositories
             _hashingService = hashingService;
         }
 
-        public async Task<long> InsertAsync(
+        public async Task<AuditEventWriteResult> InsertAsync(
             AuditEventData auditEvent,
             CancellationToken cancellationToken = default)
         {
@@ -68,6 +68,55 @@ namespace AuditLog.DAL.Repositories
                         throw new InvalidOperationException(
                             "Unable to acquire audit chain lock.");
                     }
+                }
+
+                if (!string.IsNullOrWhiteSpace(auditEvent.IdempotencyKey))
+                {
+                    await using var existingCommand = new SqlCommand(
+                        """
+                        SELECT AuditEventId, RequestHash
+                        FROM dbo.AuditEventIdempotency WITH (UPDLOCK, HOLDLOCK)
+                        WHERE CreatedBySubject = @CreatedBySubject
+                          AND IdempotencyKey = @IdempotencyKey;
+                        """,
+                        connection,
+                        transaction);
+
+                    existingCommand.Parameters.Add(
+                        "@CreatedBySubject", SqlDbType.NVarChar, 150)
+                        .Value = auditEvent.CreatedBySubject;
+                    existingCommand.Parameters.Add(
+                        "@IdempotencyKey", SqlDbType.NVarChar, 128)
+                        .Value = auditEvent.IdempotencyKey;
+
+                    await using var existingReader =
+                        await existingCommand.ExecuteReaderAsync(
+                            cancellationToken);
+
+                    if (await existingReader.ReadAsync(cancellationToken))
+                    {
+                        var existingId = existingReader.GetInt64(0);
+                        var existingRequestHash =
+                            (byte[])existingReader["RequestHash"];
+
+                        if (!System.Security.Cryptography.CryptographicOperations
+                            .FixedTimeEquals(existingRequestHash, contentHash))
+                        {
+                            throw new InvalidOperationException(
+                                "The idempotency key was already used with a different audit event.");
+                        }
+
+                        await existingReader.DisposeAsync();
+                        await transaction.CommitAsync(cancellationToken);
+
+                        return new AuditEventWriteResult
+                        {
+                            Id = existingId,
+                            IsReplay = true
+                        };
+                    }
+
+                    await existingReader.DisposeAsync();
                 }
 
                 // Get the previous record hash.
@@ -183,9 +232,52 @@ namespace AuditLog.DAL.Repositories
 
                 long id = Convert.ToInt64(insertedId);
 
+                if (!string.IsNullOrWhiteSpace(auditEvent.IdempotencyKey))
+                {
+                    await using var idempotencyCommand = new SqlCommand(
+                        """
+                        INSERT INTO dbo.AuditEventIdempotency
+                        (
+                            IdempotencyKey,
+                            CreatedBySubject,
+                            RequestHash,
+                            AuditEventId
+                        )
+                        VALUES
+                        (
+                            @IdempotencyKey,
+                            @CreatedBySubject,
+                            @RequestHash,
+                            @AuditEventId
+                        );
+                        """,
+                        connection,
+                        transaction);
+
+                    idempotencyCommand.Parameters.Add(
+                        "@IdempotencyKey", SqlDbType.NVarChar, 128)
+                        .Value = auditEvent.IdempotencyKey;
+                    idempotencyCommand.Parameters.Add(
+                        "@CreatedBySubject", SqlDbType.NVarChar, 150)
+                        .Value = auditEvent.CreatedBySubject;
+                    idempotencyCommand.Parameters.Add(
+                        "@RequestHash", SqlDbType.VarBinary, 32)
+                        .Value = contentHash;
+                    idempotencyCommand.Parameters.Add(
+                        "@AuditEventId", SqlDbType.BigInt)
+                        .Value = id;
+
+                    await idempotencyCommand.ExecuteNonQueryAsync(
+                        cancellationToken);
+                }
+
                 await transaction.CommitAsync(cancellationToken);
 
-                return id;
+                return new AuditEventWriteResult
+                {
+                    Id = id,
+                    IsReplay = false
+                };
             }
             catch
             {

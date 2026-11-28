@@ -25,6 +25,13 @@ queries, and detect changes to stored events through hash-chain verification.
 
 ## Access control
 
+`POST /api/audit-events` supports an optional `Idempotency-Key` header. Reusing
+the same key with the same authenticated user and identical event data returns
+the original event ID and adds `Idempotent-Replayed: true`. Reusing a key for
+different event data returns HTTP 409. `X-Idempotency-Key` is accepted as a
+compatibility alias. Without a key, event creation remains a normal append
+operation.
+
 Scenario A endpoints require JWT Bearer authentication and the matching
 permission claims:
 

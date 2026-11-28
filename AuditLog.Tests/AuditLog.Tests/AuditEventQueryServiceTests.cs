@@ -195,7 +195,7 @@ public sealed class AuditEventQueryServiceTests
             });
         }
 
-        public Task<long> InsertAsync(
+        public Task<AuditEventWriteResult> InsertAsync(
             AuditEventData auditEvent,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

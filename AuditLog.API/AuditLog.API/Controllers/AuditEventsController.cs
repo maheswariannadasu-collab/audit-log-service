@@ -53,12 +53,40 @@ namespace AuditLog.API.Controllers
                 return Unauthorized();
             }
 
+            string? idempotencyKey = null;
+            if (Request.Headers.TryGetValue("Idempotency-Key",
+                    out var idempotencyValues))
+            {
+                if (idempotencyValues.Count != 1)
+                {
+                    return BadRequest("Idempotency-Key must contain exactly one value.");
+                }
+                idempotencyKey = idempotencyValues[0]?.Trim();
+            }
+            else if (Request.Headers.TryGetValue("X-Idempotency-Key",
+                    out var legacyIdempotencyValues))
+            {
+                if (legacyIdempotencyValues.Count != 1)
+                {
+                    return BadRequest("X-Idempotency-Key must contain exactly one value.");
+                }
+                idempotencyKey = legacyIdempotencyValues[0]?.Trim();
+            }
+
+            if (idempotencyKey is not null &&
+                (idempotencyKey.Length == 0 || idempotencyKey.Length > 128))
+            {
+                return BadRequest(
+                    "Idempotency-Key must contain 1 to 128 characters.");
+            }
+
             var auditEvent = new AuditEventData
             {
                 EventType = request.EventType,
                 ActorId = subject,
                 CreatedBySubject = subject,
                 CreatedByDisplayName = displayName ?? subject,
+                IdempotencyKey = idempotencyKey,
                 ResourceType = request.ResourceType,
                 ResourceId = request.ResourceId,
                 EventTimestampUtc =
@@ -66,15 +94,33 @@ namespace AuditLog.API.Controllers
                 Payload = request.Payload.Clone()
             };
 
-            long id = await _writerService.WriteAsync(
-                auditEvent,
-                cancellationToken);
+            AuditEventWriteResult writeResult;
+            try
+            {
+                writeResult = await _writerService.WriteAsync(
+                    auditEvent,
+                    cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains(
+                    "idempotency key",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return Conflict(new { message = ex.Message });
+            }
 
             var response = new CreateAuditEventResponse
             {
-                Id = id,
-                Message = "Audit event created successfully."
+                Id = writeResult.Id,
+                Message = writeResult.IsReplay
+                    ? "Audit event replayed successfully."
+                    : "Audit event created successfully."
             };
+
+            if (writeResult.IsReplay)
+            {
+                Response.Headers["Idempotent-Replayed"] = "true";
+            }
 
             return StatusCode(
                 StatusCodes.Status201Created,

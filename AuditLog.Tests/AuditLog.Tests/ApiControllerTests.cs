@@ -17,6 +17,8 @@ public sealed class AuditEventsControllerTests
     {
         var repository = new ControllerAuditEventRepository();
         var controller = CreateController(repository);
+        controller.Request.Headers["Idempotency-Key"] =
+            "test-idempotency-key";
         using var payload = JsonDocument.Parse("""{"action":"view"}""");
         var timestamp = DateTimeOffset.UtcNow;
 
@@ -40,6 +42,9 @@ public sealed class AuditEventsControllerTests
         Assert.Equal(timestamp, repository.InsertedEvent?.EventTimestampUtc);
         Assert.Equal("demo-auditwriter", repository.InsertedEvent?.CreatedBySubject);
         Assert.Equal("AuditWriter", repository.InsertedEvent?.CreatedByDisplayName);
+        Assert.Equal(
+            "test-idempotency-key",
+            repository.InsertedEvent?.IdempotencyKey);
     }
 
     [Fact]
@@ -236,12 +241,16 @@ public sealed class AuditEventsControllerTests
 
         public Exception? QueryException { get; init; }
 
-        public Task<long> InsertAsync(
+        public Task<AuditEventWriteResult> InsertAsync(
             AuditEventData auditEvent,
             CancellationToken cancellationToken = default)
         {
             InsertedEvent = auditEvent;
-            return Task.FromResult(42L);
+            return Task.FromResult(new AuditEventWriteResult
+            {
+                Id = 42,
+                IsReplay = false
+            });
         }
 
         public Task<AuditEventRecord?> GetByIdAsync(

@@ -5,9 +5,9 @@
 - Verified: 2026-11-27
 - Target framework: .NET 10
 - SQL Server: LocalDB `(localdb)\MSSQLLocalDB`
-- SQL integration methods: 10 passed, 0 failed, 0 skipped
-- Full suite with integration enabled: **143 passed, 0 failed, 0 skipped**
-- Full suite without integration opt-in: **133 passed, 0 failed, 10 skipped**
+- SQL integration methods: 11 passed, 0 failed, 0 skipped
+- Full suite with integration enabled: **140 passed, 0 failed, 0 skipped**
+- Full suite without integration opt-in: **129 passed, 0 failed, 11 skipped**
 
 The integration tests use a real SQL Server database. The fixture creates a
 uniquely named disposable database (`AuditLogIntegration_<id>`), applies
@@ -67,7 +67,7 @@ separate target-database run log was supplied.
 
 The percentages below are from the earlier **132-test** coverage run, before
 the SQL Server integration tests were added. Coverage has not yet been
-re-collected for the latest 143-test run; these figures therefore do not
+re-collected for the latest 140-test run; these figures therefore do not
 include the new SQL integration test execution.
 
 | Assembly | Line coverage | Branch coverage |

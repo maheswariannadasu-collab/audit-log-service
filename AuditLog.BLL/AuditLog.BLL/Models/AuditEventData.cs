@@ -13,6 +13,8 @@ public sealed class AuditEventData
 
     public string CreatedByDisplayName { get; init; } = string.Empty;
 
+    public string? IdempotencyKey { get; init; }
+
     public string ResourceType { get; init; } = string.Empty;
 
     public string ResourceId { get; init; } = string.Empty;

@@ -170,7 +170,7 @@ public sealed class ComplianceReportServiceTests
             });
         }
 
-        public Task<long> InsertAsync(
+        public Task<AuditEventWriteResult> InsertAsync(
             AuditEventData auditEvent,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

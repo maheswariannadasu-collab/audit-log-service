@@ -14,11 +14,11 @@ public sealed class AuditEventWriterServiceTests
         var service = new AuditEventWriterService(repository);
         var auditEvent = new AuditEventData();
 
-        var id = await service.WriteAsync(
+        var result = await service.WriteAsync(
             auditEvent,
             cancellationSource.Token);
 
-        Assert.Equal(42, id);
+        Assert.Equal(42, result.Id);
         Assert.Same(auditEvent, repository.ReceivedEvent);
         Assert.Equal(cancellationSource.Token, repository.ReceivedToken);
     }
@@ -59,7 +59,7 @@ public sealed class AuditEventWriterServiceTests
 
         public Exception? ExceptionToThrow { get; init; }
 
-        public Task<long> InsertAsync(
+        public Task<AuditEventWriteResult> InsertAsync(
             AuditEventData auditEvent,
             CancellationToken cancellationToken = default)
         {
@@ -71,7 +71,11 @@ public sealed class AuditEventWriterServiceTests
                 throw ExceptionToThrow;
             }
 
-            return Task.FromResult(42L);
+            return Task.FromResult(new AuditEventWriteResult
+            {
+                Id = 42,
+                IsReplay = false
+            });
         }
 
         public Task<AuditEventRecord?> GetByIdAsync(

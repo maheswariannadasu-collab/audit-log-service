@@ -347,6 +347,79 @@ public sealed class SqlServerApiIntegrationTests
     }
 
     [SqlServerIntegrationFact]
+    public async Task CreateEventWithIdempotencyKey_ReplaysOriginalAuditEvent()
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+
+        using var firstRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/audit-events");
+        firstRequest.Headers.Add("Idempotency-Key", "integration-idempotency-key");
+        firstRequest.Content = JsonContent.Create(new
+        {
+            eventType = "IDEMPOTENCY_TEST",
+            resourceType = "ACCOUNT",
+            resourceId = "ACCOUNT100",
+            eventTimestampUtc = timestamp,
+            payload = new { attempt = 1 }
+        });
+
+        using var firstResponse = await _client.SendAsync(firstRequest);
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+
+        using var firstDocument = JsonDocument.Parse(
+            await firstResponse.Content.ReadAsStringAsync());
+        var firstId = GetProperty(firstDocument.RootElement, "id").GetInt64();
+        Assert.False(
+            firstResponse.Headers.Contains("Idempotent-Replayed"));
+
+        using var replayRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/audit-events");
+        replayRequest.Headers.Add("Idempotency-Key", "integration-idempotency-key");
+        replayRequest.Content = JsonContent.Create(new
+        {
+            eventType = "IDEMPOTENCY_TEST",
+            resourceType = "ACCOUNT",
+            resourceId = "ACCOUNT100",
+            eventTimestampUtc = timestamp,
+            payload = new { attempt = 1 }
+        });
+
+        using var replayResponse = await _client.SendAsync(replayRequest);
+        Assert.Equal(HttpStatusCode.Created, replayResponse.StatusCode);
+        Assert.True(
+            replayResponse.Headers.Contains("Idempotent-Replayed"));
+
+        using var replayDocument = JsonDocument.Parse(
+            await replayResponse.Content.ReadAsStringAsync());
+        Assert.Equal(
+            firstId,
+            GetProperty(replayDocument.RootElement, "id").GetInt64());
+
+        using var conflictRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/audit-events");
+        conflictRequest.Headers.Add(
+            "Idempotency-Key",
+            "integration-idempotency-key");
+        conflictRequest.Content = JsonContent.Create(new
+        {
+            eventType = "IDEMPOTENCY_TEST",
+            resourceType = "ACCOUNT",
+            resourceId = "ACCOUNT100",
+            eventTimestampUtc = timestamp,
+            payload = new { attempt = 2 }
+        });
+
+        using var conflictResponse =
+            await _client.SendAsync(conflictRequest);
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            conflictResponse.StatusCode);
+    }
+
+    [SqlServerIntegrationFact]
     public async Task ExportEndpoints_ReturnFilteredDataAndVerifiableChainProof()
     {
         var targetResource = NewIdentifier("target");
@@ -717,8 +790,10 @@ public sealed class SqlServerDatabaseFixture : IAsyncLifetime
     public async Task ResetDatabaseAsync()
     {
         const string sql = """
+            DELETE FROM dbo.AuditEventIdempotency;
             DELETE FROM dbo.AuditEventRedactions;
             DELETE FROM dbo.AuditEvents;
+            DBCC CHECKIDENT ('dbo.AuditEventIdempotency', RESEED, 0);
             DBCC CHECKIDENT ('dbo.AuditEventRedactions', RESEED, 0);
             DBCC CHECKIDENT ('dbo.AuditEvents', RESEED, 0);
             """;
@@ -838,7 +913,8 @@ public sealed class SqlServerDatabaseFixture : IAsyncLifetime
             "002_AddAuditRetentionColumns.sql",
             "003_CreateAuditEventRedactions.sql",
             "004_AddRedactedContentHash.sql",
-            "006_AddAuditActorIdentity.sql"
+            "006_AddAuditActorIdentity.sql",
+            "007_CreateAuditEventIdempotency.sql"
         };
 
         foreach (var migrationFile in migrationFiles)

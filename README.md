@@ -305,8 +305,9 @@ Execute the SQL scripts available in:
 database/Scripts/
 ```
 
-Apply scripts `001` through `006` in order. Script `004` adds the redacted
-content hash; script `006` adds server-verified JWT actor attribution.
+Apply scripts `001` through `007` in order. Script `004` adds the redacted
+content hash; script `006` adds server-verified JWT actor attribution; script
+`007` adds POST audit-event idempotency storage.
 
 ### Step 4 – Configure Connection String
 
@@ -406,7 +407,7 @@ The opt-in integration suite exercises the API against SQL Server, including
 JWT authorization, database queries, retention, redaction, exports,
 compliance reports, health checks, and tampering detection. The admin
 connection uses `master` only for database setup. The suite creates a temporary
-database named `AuditLogIntegration_<id>`, applies scripts `001`–`006`, runs the
+database named `AuditLogIntegration_<id>`, applies scripts `001`–`007`, runs the
 tests against it, then drops it. The application's `AuditLogDB` is not used or
 modified. Use a dedicated test SQL Server instance, not a production or shared
 development instance.
@@ -420,9 +421,9 @@ dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj
 ```
 
 The admin connection must connect to `master` and have permission to create
-and drop databases. Without both environment variables, the 10 SQL Server
+and drop databases. Without both environment variables, the 11 SQL Server
 integration tests are skipped. The latest full run with integration enabled
-passed all 143 tests; see [Test-Coverage.md](docs/Test-Coverage.md) for details.
+passed all 140 tests; see [Test-Coverage.md](docs/Test-Coverage.md) for details.
 
 ### Security Testing
 - SQL database tampering detection is covered by hash-chain integration tests.
@@ -501,7 +502,7 @@ The following areas remain limitations or require further validation:
 | Scenario B – Retention, Redaction and Export | Implemented; SQL Server integration tests passed |
 | Scenario C – Compliance Reporting | Implemented; SQL Server integration tests passed |
 | Architecture Documentation | Prepared |
-| Automated Testing | Unit and SQL Server integration tests; latest full run: 143 passed |
+| Automated Testing | Unit and SQL Server integration tests; latest full run: 140 passed |
 | Azure Deployment | Planned |
 
 ## 14. Author and Ownership

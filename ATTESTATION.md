@@ -27,9 +27,9 @@ identity provider and database-backed account mapping remain pending.
 
 Verified on 2026-11-27 for the .NET 10 solution:
 
-- With SQL Server integration enabled: **143 passed, 0 failed, 0 skipped**,
-  including 10 SQL Server integration test methods.
-- Without integration opt-in: **133 passed, 0 failed, 10 skipped**.
+- With SQL Server integration enabled: **140 passed, 0 failed, 0 skipped**,
+  including 11 SQL Server integration test methods.
+- Without integration opt-in: **129 passed, 0 failed, 11 skipped**.
 - The full test run built the API, BLL, DAL, and test projects successfully.
 
 The integration fixture used a real LocalDB instance, created a uniquely named
@@ -42,7 +42,7 @@ and test details.
 
 The following coverage figures are from the earlier 132-test coverage run,
 before the SQL Server integration tests were added; coverage has not been
-re-collected for the latest 143-test run:
+re-collected for the latest 140-test run:
 
 | Assembly | Line coverage | Branch coverage |
 |---|---:|---:|

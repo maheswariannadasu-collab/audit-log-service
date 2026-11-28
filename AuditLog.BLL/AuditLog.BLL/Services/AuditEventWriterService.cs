@@ -13,7 +13,7 @@ public sealed class AuditEventWriterService
         _repository = repository;
     }
 
-    public async Task<long> WriteAsync(
+    public async Task<AuditEventWriteResult> WriteAsync(
         AuditEventData auditEvent,
         CancellationToken cancellationToken = default)
     {
