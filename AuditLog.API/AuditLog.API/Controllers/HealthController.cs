@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.SqlClient;
+using AuditLog.API.Errors;
 
 namespace AuditLog.API.Controllers
 {
@@ -46,11 +47,11 @@ namespace AuditLog.API.Controllers
             }
             catch (SqlException)
             {
-                return StatusCode(503, new
-                {
-                    status = "Unhealthy",
-                    message = "Database connection failed."
-                });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext,
+                    StatusCodes.Status503ServiceUnavailable,
+                    "Service unavailable",
+                    "Database health check failed.");
             }
         }
     }

@@ -3,6 +3,7 @@ using AuditLog.BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
+using AuditLog.API.Errors;
 
 namespace AuditLog.API.Controllers
 {
@@ -39,7 +40,8 @@ namespace AuditLog.API.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed", ex.Message);
             }
         }
 
@@ -64,7 +66,8 @@ namespace AuditLog.API.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed", ex.Message);
             }
         }
 
@@ -93,7 +96,8 @@ namespace AuditLog.API.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed", ex.Message);
             }
         }
     }

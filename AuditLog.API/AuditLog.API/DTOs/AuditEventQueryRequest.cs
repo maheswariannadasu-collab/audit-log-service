@@ -52,11 +52,13 @@ public sealed class AuditEventQueryRequest
     [FromQuery(Name = "toUtc")]
     public DateTimeOffset? ToUtc { get; init; }
 
-    [Range(1, int.MaxValue)]
+    [Range(1, int.MaxValue,
+        ErrorMessage = "Page must be greater than or equal to 1.")]
     [FromQuery(Name = "page")]
     public int Page { get; init; } = 1;
 
-    [Range(1, AuditEventQuery.MaximumPageSize)]
+    [Range(1, AuditEventQuery.MaximumPageSize,
+        ErrorMessage = "PageSize must be between 1 and 100.")]
     [FromQuery(Name = "pageSize")]
     public int PageSize { get; init; } = AuditEventQuery.DefaultPageSize;
 }

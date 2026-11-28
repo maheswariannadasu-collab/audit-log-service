@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using System.ComponentModel.DataAnnotations;
+using AuditLog.API.Errors;
 
 namespace AuditLog.API.Controllers;
 
@@ -29,13 +31,21 @@ public sealed class AuthController : ControllerBase
                 request.Username,
                 out var permissions))
         {
-            return Unauthorized(new { message = "Unknown demo user." });
+            return ApiProblemDetailsFactory.Status(
+                HttpContext,
+                StatusCodes.Status401Unauthorized,
+                "Unauthorized",
+                "Unknown demo user.");
         }
 
         var mode = _configuration["Jwt:Mode"] ?? "Local";
         if (!string.Equals(mode, "Local", StringComparison.OrdinalIgnoreCase))
         {
-            return BadRequest(new { message = "Local demo tokens are disabled." });
+            return ApiProblemDetailsFactory.Status(
+                HttpContext,
+                StatusCodes.Status400BadRequest,
+                "Validation failed",
+                "Local demo tokens are disabled.");
         }
 
         var issuer = _configuration["Jwt:Issuer"] ?? "AuditLog.Local";
@@ -43,9 +53,11 @@ public sealed class AuthController : ControllerBase
         var signingKey = _configuration["Jwt:SigningKey"];
         if (string.IsNullOrWhiteSpace(signingKey))
         {
-            return StatusCode(
+            return ApiProblemDetailsFactory.Status(
+                HttpContext,
                 StatusCodes.Status500InternalServerError,
-                new { message = "Jwt:SigningKey is not configured." });
+                "Internal server error",
+                "An unexpected error occurred.");
         }
 
         var lifetimeMinutes = int.TryParse(
@@ -107,6 +119,15 @@ public sealed class AuthController : ControllerBase
 
 public sealed class DemoTokenRequest
 {
+    [Required(ErrorMessage = "Username is required.")]
+    [StringLength(100, MinimumLength = 1,
+        ErrorMessage = "Username must contain 1 to 100 characters.")]
     public string Username { get; init; } = string.Empty;
+
+    [Required(ErrorMessage = "Password is required.")]
+    [StringLength(500, MinimumLength = 1,
+        ErrorMessage = "Password must contain 1 to 500 characters.")]
+    public string Password { get; init; } = string.Empty;
+
     public string? AccountId { get; init; }
 }

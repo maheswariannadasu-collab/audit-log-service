@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using AuditLog.API.Errors;
 
 namespace AuditLog.API.Controllers
 {
@@ -35,24 +36,28 @@ namespace AuditLog.API.Controllers
             if (request.Payload.ValueKind == JsonValueKind.Undefined ||
                 request.Payload.ValueKind == JsonValueKind.Undefined)
             {
-                return BadRequest("Payload is required.");
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed", "Payload is required.");
             }
 
             if (request.Payload.ValueKind != JsonValueKind.Object)
             {
-                return BadRequest("Payload must be a JSON object.");
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed", "Payload must be a JSON object.");
             }
 
             if (request.EventTimestampUtc is null)
             {
-                return BadRequest("EventTimestampUtc is required.");
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed", "EventTimestampUtc is required.");
             }
 
             var subject = User.FindFirst("sub")?.Value;
             var displayName = User.FindFirst("preferred_username")?.Value;
             if (string.IsNullOrWhiteSpace(subject))
             {
-                return Unauthorized();
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 401, "Unauthorized", "A valid bearer token is required.");
             }
 
             string? idempotencyKey = null;
@@ -61,7 +66,9 @@ namespace AuditLog.API.Controllers
             {
                 if (idempotencyValues.Count != 1)
                 {
-                    return BadRequest("Idempotency-Key must contain exactly one value.");
+                    return ApiProblemDetailsFactory.Status(
+                        HttpContext, 400, "Validation failed",
+                        "Idempotency-Key must contain exactly one value.");
                 }
                 idempotencyKey = idempotencyValues[0]?.Trim();
             }
@@ -70,7 +77,9 @@ namespace AuditLog.API.Controllers
             {
                 if (legacyIdempotencyValues.Count != 1)
                 {
-                    return BadRequest("X-Idempotency-Key must contain exactly one value.");
+                    return ApiProblemDetailsFactory.Status(
+                        HttpContext, 400, "Validation failed",
+                        "X-Idempotency-Key must contain exactly one value.");
                 }
                 idempotencyKey = legacyIdempotencyValues[0]?.Trim();
             }
@@ -78,7 +87,8 @@ namespace AuditLog.API.Controllers
             if (idempotencyKey is not null &&
                 (idempotencyKey.Length == 0 || idempotencyKey.Length > 128))
             {
-                return BadRequest(
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed",
                     "Idempotency-Key must contain 1 to 128 characters.");
             }
 
@@ -108,7 +118,8 @@ namespace AuditLog.API.Controllers
                     "idempotency key",
                     StringComparison.OrdinalIgnoreCase))
             {
-                return Conflict(new { message = ex.Message });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 409, "Conflict", ex.Message);
             }
 
             var response = new CreateAuditEventResponse
@@ -137,7 +148,9 @@ namespace AuditLog.API.Controllers
         {
             if (id <= 0)
             {
-                return BadRequest("ID must be greater than zero.");
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed",
+                    "ID must be greater than zero.");
             }
 
             var auditEvent = await _queryService.GetRedactedByIdAsync(
@@ -146,10 +159,9 @@ namespace AuditLog.API.Controllers
 
             if (auditEvent is null)
             {
-                return NotFound(new
-                {
-                    message = "Audit event not found."
-                });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 404, "Not found",
+                    "Audit event not found.");
             }
 
             return Ok(ToResponse(auditEvent));
@@ -170,7 +182,9 @@ namespace AuditLog.API.Controllers
 
                 if (string.IsNullOrWhiteSpace(subject))
                 {
-                    return Unauthorized();
+                    return ApiProblemDetailsFactory.Status(
+                        HttpContext, 401, "Unauthorized",
+                        "A valid bearer token is required.");
                 }
 
                 string? effectiveAccountId = request.AccountId;
@@ -179,9 +193,9 @@ namespace AuditLog.API.Controllers
                     var claimedAccountId = User.FindFirst("accountId")?.Value;
                     if (string.IsNullOrWhiteSpace(claimedAccountId))
                     {
-                        return StatusCode(
-                            StatusCodes.Status403Forbidden,
-                            new { message = "The token has no account assignment." });
+                        return ApiProblemDetailsFactory.Status(
+                            HttpContext, 403, "Forbidden",
+                            "The token has no account assignment.");
                     }
 
                     if (!string.IsNullOrWhiteSpace(request.AccountId) &&
@@ -190,9 +204,9 @@ namespace AuditLog.API.Controllers
                             request.AccountId,
                             StringComparison.Ordinal))
                     {
-                        return StatusCode(
-                            StatusCodes.Status403Forbidden,
-                            new { message = "The token is not assigned to this account." });
+                        return ApiProblemDetailsFactory.Status(
+                            HttpContext, 403, "Forbidden",
+                            "The token is not assigned to this account.");
                     }
 
                     effectiveAccountId = claimedAccountId;
@@ -223,8 +237,9 @@ namespace AuditLog.API.Controllers
                     }
                     else
                     {
-                        return BadRequest(
-                            new { message = "PageNumber must be greater than zero." });
+                        return ApiProblemDetailsFactory.Status(
+                            HttpContext, 400, "Validation failed",
+                            "PageNumber must be greater than zero.");
                     }
                 }
                 var fromUtc = request.From ?? request.FromUtc;
@@ -260,7 +275,8 @@ namespace AuditLog.API.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed", ex.Message);
             }
         }
 

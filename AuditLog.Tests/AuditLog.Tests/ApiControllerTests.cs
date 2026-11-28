@@ -58,7 +58,8 @@ public sealed class AuditEventsControllerTests
                 timestamp: DateTimeOffset.UtcNow),
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
     }
 
     [Fact]
@@ -73,7 +74,8 @@ public sealed class AuditEventsControllerTests
                 timestamp: DateTimeOffset.UtcNow),
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
     }
 
     [Fact]
@@ -88,7 +90,8 @@ public sealed class AuditEventsControllerTests
                 timestamp: null),
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
     }
 
     [Fact]
@@ -99,7 +102,8 @@ public sealed class AuditEventsControllerTests
             0,
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         Assert.Equal(0, repository.GetRedactedCallCount);
     }
 
@@ -113,7 +117,8 @@ public sealed class AuditEventsControllerTests
 
         var result = await controller.GetById(42, CancellationToken.None);
 
-        Assert.IsType<NotFoundObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
     }
 
     [Fact]
@@ -183,7 +188,8 @@ public sealed class AuditEventsControllerTests
             },
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
     }
 
     [Fact]
@@ -355,10 +361,9 @@ public sealed class AuditIntegrityControllerTests
         var controller = new AuditIntegrityController(
             new StubIntegrityService(result));
 
-        var response = Assert.IsType<ConflictObjectResult>(
+        var response = Assert.IsType<ObjectResult>(
             await controller.Verify(CancellationToken.None));
-
-        Assert.Same(result, response.Value);
+        Assert.Equal(StatusCodes.Status409Conflict, response.StatusCode);
     }
 
     private sealed class StubIntegrityService(
@@ -425,8 +430,9 @@ public sealed class AuditRedactionControllerTests
                 PreviewException = new JsonException("invalid json")
             });
 
-        Assert.IsType<BadRequestObjectResult>(
+        var response = Assert.IsType<ObjectResult>(
             controller.PreviewRedaction(input.RootElement));
+        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -597,7 +603,8 @@ public sealed class AuditExportControllerTests
             _ => throw new ArgumentOutOfRangeException(nameof(format))
         };
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
     }
 
     private sealed class StubExportService : IAuditExportService
@@ -679,7 +686,8 @@ public sealed class ComplianceReportsControllerTests
             new ComplianceAccessReportQueryRequest(),
             CancellationToken.None);
 
-        Assert.IsType<BadRequestObjectResult>(result);
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
     }
 
     private static ComplianceReportsController CreateComplianceController(

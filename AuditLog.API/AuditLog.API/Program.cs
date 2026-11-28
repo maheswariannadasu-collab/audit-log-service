@@ -4,6 +4,7 @@ using AuditLog.BLL.Services;
 using AuditLog.API.Auth;
 using AuditLog.DAL.Data;
 using AuditLog.DAL.Repositories;
+using AuditLog.API.Errors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -15,7 +16,36 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(entry => entry.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    entry => entry.Key,
+                    entry => entry.Value!.Errors
+                        .Select(error =>
+                            string.IsNullOrWhiteSpace(error.ErrorMessage)
+                                ? "The value is invalid."
+                                : error.ErrorMessage)
+                        .ToArray(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            var detail = errors.Values
+                .SelectMany(messages => messages)
+                .FirstOrDefault()
+                ?? "The request is invalid.";
+
+            return ApiProblemDetailsFactory.Validation(
+                context.HttpContext,
+                detail,
+                errors);
+        };
+    });
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -63,16 +93,14 @@ builder.Services.AddRateLimiter(options =>
         httpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         httpContext.Response.ContentType = "application/problem+json";
 
-        var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
-        {
-            Status = StatusCodes.Status429TooManyRequests,
-            Title = "Too many requests",
-            Detail = "The request limit has been exceeded. Try again later.",
-            Instance = httpContext.Request.Path
-        };
+        var problem = ApiProblemDetailsFactory.Create(
+            httpContext,
+            StatusCodes.Status429TooManyRequests,
+            "Too many requests",
+            "The request limit has been exceeded. Try again later.");
 
-        await httpContext.Response.WriteAsync(
-            System.Text.Json.JsonSerializer.Serialize(problem),
+        await httpContext.Response.WriteAsJsonAsync(
+            problem,
             cancellationToken);
     };
 });
@@ -91,6 +119,50 @@ builder.Services
     {
         options.MapInboundClaims = false;
         options.RequireHttpsMetadata = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode =
+                    StatusCodes.Status401Unauthorized;
+                context.Response.ContentType =
+                    "application/problem+json";
+
+                var problem = ApiProblemDetailsFactory.Create(
+                    context.HttpContext,
+                    StatusCodes.Status401Unauthorized,
+                    "Unauthorized",
+                    "A valid bearer token is required.");
+
+                await context.Response.WriteAsync(
+                            System.Text.Json.JsonSerializer.Serialize(
+                                problem,
+                                new System.Text.Json.JsonSerializerOptions(
+                                    System.Text.Json.JsonSerializerDefaults.Web)),
+                    context.HttpContext.RequestAborted);
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode =
+                    StatusCodes.Status403Forbidden;
+                context.Response.ContentType =
+                    "application/problem+json";
+
+                var problem = ApiProblemDetailsFactory.Create(
+                    context.HttpContext,
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    "The authenticated user is not permitted to perform this action.");
+
+                await context.Response.WriteAsync(
+                    System.Text.Json.JsonSerializer.Serialize(
+                        problem,
+                        new System.Text.Json.JsonSerializerOptions(
+                            System.Text.Json.JsonSerializerDefaults.Web)),
+                    context.HttpContext.RequestAborted);
+            }
+        };
 
         if (string.Equals(jwtMode, "Local",
             StringComparison.OrdinalIgnoreCase))
@@ -270,6 +342,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();

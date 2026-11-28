@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using AuditLog.API.Errors;
 
 namespace AuditLog.API.Controllers
 {
@@ -41,10 +42,9 @@ namespace AuditLog.API.Controllers
             }
             catch (JsonException)
             {
-                return BadRequest(new
-                {
-                    Message = "Invalid JSON supplied."
-                });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed",
+                    "Invalid JSON supplied.");
             }
         }
 
@@ -71,22 +71,24 @@ namespace AuditLog.API.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { Message = ex.Message });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 404, "Not found", ex.Message);
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { Message = ex.Message });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed", ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return Conflict(new { Message = ex.Message });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 409, "Conflict", ex.Message);
             }
             catch (JsonException)
             {
-                return BadRequest(new
-                {
-                    Message = "Invalid audit payload JSON."
-                });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 400, "Validation failed",
+                    "Invalid audit payload JSON.");
             }
         }
     }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.RateLimiting;
+using AuditLog.API.Errors;
 
 namespace AuditLog.API.Controllers;
 
@@ -42,7 +43,9 @@ public sealed class ComplianceReportsController : ControllerBase
 
             if (string.IsNullOrWhiteSpace(subject))
             {
-                return Unauthorized();
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 401, "Unauthorized",
+                    "A valid bearer token is required.");
             }
 
             if (!hasAccountsManage &&
@@ -51,9 +54,9 @@ public sealed class ComplianceReportsController : ControllerBase
                     accountId,
                     StringComparison.Ordinal))
             {
-                return StatusCode(
-                    StatusCodes.Status403Forbidden,
-                    new { message = "The token is not assigned to this account." });
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 403, "Forbidden",
+                    "The token is not assigned to this account.");
             }
 
             var report = await _reportService.GetAccountAccessReportAsync(
@@ -71,7 +74,8 @@ public sealed class ComplianceReportsController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return ApiProblemDetailsFactory.Status(
+                HttpContext, 400, "Validation failed", ex.Message);
         }
     }
 }

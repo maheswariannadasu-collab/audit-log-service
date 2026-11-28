@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using AuditLog.API.Errors;
 
 namespace AuditLog.API.Controllers
 {
@@ -31,7 +32,13 @@ namespace AuditLog.API.Controllers
 
             if (!result.IsValid)
             {
-                return Conflict(result);
+                return ApiProblemDetailsFactory.Status(
+                    HttpContext, 409, "Conflict",
+                    result.Message,
+                    new Dictionary<string, string[]>(StringComparer.Ordinal)
+                    {
+                        ["integrity"] = [result.Message]
+                    });
             }
 
             return Ok(result);
