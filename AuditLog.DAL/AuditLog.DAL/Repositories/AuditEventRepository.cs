@@ -403,9 +403,32 @@ namespace AuditLog.DAL.Repositories
                 AND (@ResourceType IS NULL OR A.ResourceType = @ResourceType)
                 AND (@ResourceId IS NULL OR A.ResourceId = @ResourceId)
                 AND (@EventType IS NULL OR A.EventType = @EventType)
+                AND (@AccountId IS NULL OR A.ResourceId = @AccountId)
+                AND (@Action IS NULL OR
+                    LOWER(COALESCE(
+                        NULLIF(JSON_VALUE(A.PayloadJson, '$.action'), ''),
+                        A.EventType)) = LOWER(@Action))
+                AND (@Search IS NULL OR
+                    LOWER(A.EventType) LIKE LOWER(@Search) OR
+                    LOWER(A.PayloadJson) LIKE LOWER(@Search))
                 AND (@FromUtc IS NULL OR A.EventTimestampUtc >= @FromUtc)
                 AND (@ToUtc IS NULL OR A.EventTimestampUtc < @ToUtc)
                 """;
+
+            var sortExpression = query.SortBy switch
+            {
+                "action" => "COALESCE(NULLIF(JSON_VALUE(A.PayloadJson, '$.action'), ''), A.EventType)",
+                "accountId" => "A.ResourceId",
+                _ => "A.EventTimestampUtc"
+            };
+            var sortDirection =
+                string.Equals(query.SortDir, "asc",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "ASC"
+                    : "DESC";
+            var secondarySort = sortDirection == "ASC"
+                ? "A.Id ASC"
+                : "A.Id DESC";
 
             var sql = $"""
                 SELECT COUNT_BIG(*)
@@ -427,7 +450,7 @@ namespace AuditLog.DAL.Repositories
                 LEFT JOIN dbo.AuditEventRedactions R
                     ON A.Id = R.AuditEventId
                 WHERE {filter}
-                ORDER BY A.Id DESC
+                ORDER BY {sortExpression} {sortDirection}, {secondarySort}
                 OFFSET @Offset ROWS
                 FETCH NEXT @PageSize ROWS ONLY;
                 """;
@@ -448,6 +471,14 @@ namespace AuditLog.DAL.Repositories
                 .Value = (object?)query.ResourceId ?? DBNull.Value;
             command.Parameters.Add("@EventType", SqlDbType.NVarChar, 100)
                 .Value = (object?)query.EventType ?? DBNull.Value;
+            command.Parameters.Add("@AccountId", SqlDbType.NVarChar, 150)
+                .Value = (object?)query.AccountId ?? DBNull.Value;
+            command.Parameters.Add("@Action", SqlDbType.NVarChar, 100)
+                .Value = (object?)query.Action ?? DBNull.Value;
+            command.Parameters.Add("@Search", SqlDbType.NVarChar, 500)
+                .Value = string.IsNullOrWhiteSpace(query.Search)
+                    ? DBNull.Value
+                    : $"%{query.Search}%";
             command.Parameters.Add("@FromUtc", SqlDbType.DateTime2)
                 .Value = (object?)query.FromUtc?.UtcDateTime ?? DBNull.Value;
             command.Parameters.Add("@ToUtc", SqlDbType.DateTime2)
@@ -500,7 +531,8 @@ namespace AuditLog.DAL.Repositories
                 Items = records,
                 TotalCount = totalCount,
                 PageNumber = query.PageNumber,
-                PageSize = query.PageSize
+                PageSize = query.PageSize,
+                TotalPages = (int)((totalCount + query.PageSize - 1) / query.PageSize)
             };
         }
     }

@@ -13,6 +13,16 @@ public sealed class AuditEventQuery
 
     public string? EventType { get; init; }
 
+    public string? AccountId { get; init; }
+
+    public string? Action { get; init; }
+
+    public string? Search { get; init; }
+
+    public string SortBy { get; init; } = "createdAt";
+
+    public string SortDir { get; init; } = "desc";
+
     public DateTimeOffset? FromUtc { get; init; }
 
     public DateTimeOffset? ToUtc { get; init; }

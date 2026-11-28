@@ -72,6 +72,52 @@ public sealed class AuditEventQueryServiceTests
         Assert.Equal(25, result.PageSize);
     }
 
+    [Fact]
+    public async Task QueryAsync_ForwardsAccountActionSearchAndSorting()
+    {
+        var repository = new RecordingAuditEventRepository();
+        var service = new AuditEventQueryService(repository);
+        var query = new AuditEventQuery
+        {
+            AccountId = "ACC123",
+            Action = "DEPOSIT",
+            Search = "Ravi",
+            SortBy = "action",
+            SortDir = "asc",
+            PageNumber = 2,
+            PageSize = 10
+        };
+
+        await service.QueryAsync(query);
+
+        Assert.Same(query, repository.ReceivedQuery);
+        Assert.Equal("ACC123", repository.ReceivedQuery?.AccountId);
+        Assert.Equal("DEPOSIT", repository.ReceivedQuery?.Action);
+        Assert.Equal("Ravi", repository.ReceivedQuery?.Search);
+        Assert.Equal("action", repository.ReceivedQuery?.SortBy);
+        Assert.Equal("asc", repository.ReceivedQuery?.SortDir);
+    }
+
+    [Theory]
+    [InlineData("invalid", "sideways")]
+    [InlineData("", "")]
+    public async Task QueryAsync_AuthorizesInvalidSortFallbackWithoutThrowing(
+        string sortBy,
+        string sortDir)
+    {
+        var repository = new RecordingAuditEventRepository();
+        var service = new AuditEventQueryService(repository);
+
+        var result = await service.QueryAsync(new AuditEventQuery
+        {
+            SortBy = sortBy,
+            SortDir = sortDir
+        });
+
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(AuditEventQuery.DefaultPageSize, result.PageSize);
+    }
+
     [Theory]
     [InlineData(0, 50)]
     [InlineData(1, 0)]

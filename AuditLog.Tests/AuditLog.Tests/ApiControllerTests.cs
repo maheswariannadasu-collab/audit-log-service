@@ -143,7 +143,12 @@ public sealed class AuditEventsControllerTests
             {
                 ActorId = "USER001",
                 ResourceId = "ACCOUNT100",
-                PageNumber = 2,
+                AccountId = "ACCOUNT100",
+                Action = "DEPOSIT",
+                Search = "Ravi",
+                SortBy = "action",
+                SortDir = "asc",
+                Page = 2,
                 PageSize = 10
             },
             CancellationToken.None);
@@ -154,6 +159,11 @@ public sealed class AuditEventsControllerTests
         Assert.Equal(10, page.PageSize);
         Assert.Single(page.Items);
         Assert.Equal("USER001", repository.ReceivedQuery?.ActorId);
+        Assert.Equal("ACCOUNT100", repository.ReceivedQuery?.AccountId);
+        Assert.Equal("DEPOSIT", repository.ReceivedQuery?.Action);
+        Assert.Equal("Ravi", repository.ReceivedQuery?.Search);
+        Assert.Equal("action", repository.ReceivedQuery?.SortBy);
+        Assert.Equal("asc", repository.ReceivedQuery?.SortDir);
         Assert.Equal("ACCOUNT100", repository.ReceivedQuery?.ResourceId);
     }
 
@@ -205,7 +215,9 @@ public sealed class AuditEventsControllerTests
                     new ClaimsIdentity(
                         [
                             new Claim("sub", "demo-auditwriter"),
-                            new Claim("preferred_username", "AuditWriter")
+                            new Claim("preferred_username", "AuditWriter"),
+                            new Claim("accountId", "ACCOUNT100"),
+                            new Claim("permissions", "audit.accounts.manage")
                         ],
                         "JWT"))
             }

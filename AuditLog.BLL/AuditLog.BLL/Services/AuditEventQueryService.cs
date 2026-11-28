@@ -67,6 +67,10 @@ namespace AuditLog.BLL.Services
                     nameof(query));
             }
 
+            ValidateFilterLength(query.AccountId, 150, nameof(query.AccountId));
+            ValidateFilterLength(query.Action, 100, nameof(query.Action));
+            ValidateFilterLength(query.Search, 500, nameof(query.Search));
+
             ValidateFilterLength(query.ActorId, 150, nameof(query.ActorId));
             ValidateFilterLength(query.ResourceType, 100, nameof(query.ResourceType));
             ValidateFilterLength(query.ResourceId, 150, nameof(query.ResourceId));

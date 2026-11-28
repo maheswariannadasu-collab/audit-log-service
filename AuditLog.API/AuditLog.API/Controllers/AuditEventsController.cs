@@ -163,6 +163,73 @@ namespace AuditLog.API.Controllers
         {
             try
             {
+                var subject = User.FindFirst("sub")?.Value;
+                var hasAccountsManage = User.FindAll("permissions")
+                    .Any(claim => claim.Value ==
+                        JwtPermissions.AccountsManage);
+
+                if (string.IsNullOrWhiteSpace(subject))
+                {
+                    return Unauthorized();
+                }
+
+                string? effectiveAccountId = request.AccountId;
+                if (!hasAccountsManage)
+                {
+                    var claimedAccountId = User.FindFirst("accountId")?.Value;
+                    if (string.IsNullOrWhiteSpace(claimedAccountId))
+                    {
+                        return StatusCode(
+                            StatusCodes.Status403Forbidden,
+                            new { message = "The token has no account assignment." });
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(request.AccountId) &&
+                        !string.Equals(
+                            claimedAccountId,
+                            request.AccountId,
+                            StringComparison.Ordinal))
+                    {
+                        return StatusCode(
+                            StatusCodes.Status403Forbidden,
+                            new { message = "The token is not assigned to this account." });
+                    }
+
+                    effectiveAccountId = claimedAccountId;
+                }
+
+                var sortBy = string.Equals(request.SortBy, "action",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "action"
+                    : string.Equals(request.SortBy, "accountId",
+                        StringComparison.OrdinalIgnoreCase)
+                        ? "accountId"
+                        : "createdAt";
+                var sortDir = string.Equals(request.SortDir, "asc",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "asc"
+                    : "desc";
+                var pageNumber = request.Page;
+                if (Request.Query.TryGetValue("pageNumber", out var legacyPageValues)
+                    && !Request.Query.ContainsKey("page"))
+                {
+                    if (legacyPageValues.Count == 1
+                        && int.TryParse(
+                            legacyPageValues[0],
+                            out var legacyPageNumber)
+                        && legacyPageNumber >= 1)
+                    {
+                        pageNumber = legacyPageNumber;
+                    }
+                    else
+                    {
+                        return BadRequest(
+                            new { message = "PageNumber must be greater than zero." });
+                    }
+                }
+                var fromUtc = request.From ?? request.FromUtc;
+                var toUtc = request.To ?? request.ToUtc;
+
                 var result = await _queryService.QueryAsync(
                     new AuditEventQuery
                     {
@@ -170,9 +237,14 @@ namespace AuditLog.API.Controllers
                         ResourceType = request.ResourceType,
                         ResourceId = request.ResourceId,
                         EventType = request.EventType,
-                        FromUtc = request.FromUtc,
-                        ToUtc = request.ToUtc,
-                        PageNumber = request.PageNumber,
+                        AccountId = effectiveAccountId,
+                        Action = request.Action,
+                        Search = request.Search,
+                        SortBy = sortBy,
+                        SortDir = sortDir,
+                        FromUtc = fromUtc,
+                        ToUtc = toUtc,
+                        PageNumber = pageNumber,
                         PageSize = request.PageSize
                     },
                     cancellationToken);
@@ -182,7 +254,8 @@ namespace AuditLog.API.Controllers
                     Items = result.Items.Select(ToResponse).ToArray(),
                     TotalCount = result.TotalCount,
                     PageNumber = result.PageNumber,
-                    PageSize = result.PageSize
+                    PageSize = result.PageSize,
+                    TotalPages = result.TotalPages
                 });
             }
             catch (ArgumentException ex)

@@ -10,4 +10,6 @@ public sealed class AuditEventPageResponse
     public int PageNumber { get; init; }
 
     public int PageSize { get; init; }
+
+    public int TotalPages { get; init; }
 }
