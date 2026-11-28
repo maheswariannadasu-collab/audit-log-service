@@ -1,39 +1,41 @@
 ﻿using AuditLog.DAL.Data;
-using AuditLog.API.Auth;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.SqlClient;
 
 namespace AuditLog.API.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("/health")]
     [ApiController]
+    [AllowAnonymous]
+    [DisableRateLimiting]
     public class HealthController : ControllerBase
     {
         private readonly SqlConnectionFactory _connectionFactory;
 
-        public HealthController(
-            SqlConnectionFactory connectionFactory)
+        public HealthController(SqlConnectionFactory connectionFactory)
         {
             _connectionFactory = connectionFactory;
         }
 
+        // GET /health - Public, No DB, No Auth, No Rate Limit
+        [HttpGet]
+        public IActionResult Check()
+        {
+            return Ok(new { status = "Healthy" });
+        }
+
+        // GET /health/database - Checks DB
         [HttpGet("database")]
-        public async Task<IActionResult> CheckDatabase(
-            CancellationToken cancellationToken)
+        public async Task<IActionResult> CheckDatabase(CancellationToken cancellationToken)
         {
             try
             {
-                await using var connection =
-                    _connectionFactory.CreateConnection();
-
+                await using var connection = _connectionFactory.CreateConnection();
                 await connection.OpenAsync(cancellationToken);
-
-                await using var command =
-                    new SqlCommand("SELECT 1", connection);
-
-                var result =
-                    await command.ExecuteScalarAsync(cancellationToken);
+                await using var command = new SqlCommand("SELECT 1", connection);
+                var result = await command.ExecuteScalarAsync(cancellationToken);
 
                 return Ok(new
                 {
@@ -51,6 +53,5 @@ namespace AuditLog.API.Controllers
                 });
             }
         }
-
     }
 }

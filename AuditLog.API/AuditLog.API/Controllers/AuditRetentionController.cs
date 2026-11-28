@@ -1,12 +1,14 @@
 ﻿using AuditLog.API.Auth;
 using AuditLog.BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuditLog.API.Controllers
 {
     [ApiController]
     [Route("api/audit-retention")]
+    [EnableRateLimiting("api-general")]
     public class AuditRetentionController : ControllerBase
     {
         private readonly IAuditRetentionService _retentionService;

@@ -3,6 +3,7 @@ using AuditLog.API.DTOs;
 using AuditLog.BLL.Models;
 using AuditLog.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -11,6 +12,7 @@ namespace AuditLog.API.Controllers
 {
     [ApiController]
     [Route("api/audit-events")]
+    [EnableRateLimiting("api-general")]
     public sealed class AuditEventsController : ControllerBase
     {
         private readonly AuditEventWriterService _writerService;

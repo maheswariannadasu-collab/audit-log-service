@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using AuditLog.API.Auth;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
@@ -21,6 +22,7 @@ public sealed class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("token")]
+    [EnableRateLimiting("auth-token")]
     public IActionResult IssueToken([FromBody] DemoTokenRequest request)
     {
         if (!JwtPermissions.DemoUsers.TryGetValue(

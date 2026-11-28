@@ -5,12 +5,14 @@ using AuditLog.BLL.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AuditLog.API.Controllers;
 
 [ApiController]
 [Route("api/compliance-reports")]
 [Authorize(Policy = JwtPolicyNames.ReportsRead)]
+[EnableRateLimiting("api-general")]
 public sealed class ComplianceReportsController : ControllerBase
 {
     private readonly IComplianceReportService _reportService;

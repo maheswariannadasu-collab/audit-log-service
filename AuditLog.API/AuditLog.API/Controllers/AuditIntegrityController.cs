@@ -1,6 +1,7 @@
 ﻿using AuditLog.API.Auth;
 using AuditLog.BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,6 +10,7 @@ namespace AuditLog.API.Controllers
     [ApiController]
     [Route("api/audit-integrity")]
     [Route("audit")]
+    [EnableRateLimiting("api-general")]
     public class AuditIntegrityController : ControllerBase
     {
         private readonly IAuditIntegrityService _integrityService;

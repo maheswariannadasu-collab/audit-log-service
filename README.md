@@ -383,6 +383,19 @@ GET /api/audit-events/1?id=1
 The current controller routes are covered by the authorization tests; see
 [Test-Coverage.md](docs/Test-Coverage.md) for the verified test results.
 
+### Rate Limiting
+
+The API uses the built-in ASP.NET Core fixed-window rate limiter:
+
+- `POST /auth/token`: 5 requests per minute per IP.
+- `/api/*` with a valid JWT: 100 requests per minute per `sub` claim.
+- `/api/*` without a valid JWT: 20 requests per minute per IP.
+- `/health` and `/api/health/database` are not rate limited.
+- `/openapi` and Scalar documentation endpoints are not rate limited.
+
+Exceeding a limit returns HTTP 429. Token limiting includes `Retry-After: 60`;
+API limiting uses a ProblemDetails JSON response.
+
 ## 8. Testing Strategy
 
 ### Unit Testing

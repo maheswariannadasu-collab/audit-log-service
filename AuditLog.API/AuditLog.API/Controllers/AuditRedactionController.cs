@@ -2,6 +2,7 @@
 using AuditLog.BLL.Interfaces;
 using AuditLog.BLL.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -11,6 +12,7 @@ namespace AuditLog.API.Controllers
 
     [ApiController]
     [Route("api/audit-redaction")]
+    [EnableRateLimiting("api-general")]
     public class AuditRedactionController : ControllerBase
     {
         private readonly IAuditRedactionService _redactionService;

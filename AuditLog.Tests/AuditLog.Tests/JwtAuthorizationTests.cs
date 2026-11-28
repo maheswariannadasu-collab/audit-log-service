@@ -201,8 +201,9 @@ public sealed class JwtAuthorizationTests
     [Fact]
     public async Task HealthEndpoint_IsAccessibleWithoutToken()
     {
-        var response = await _client.GetAsync("/api/health/database");
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var response = await _client.GetAsync("/health");
+        Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode);
     }
 
     [Fact]

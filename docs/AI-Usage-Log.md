@@ -426,7 +426,7 @@ individual identity.
 - `AuditLog.API/AuditLog.API/Controllers/AuditRedactionController.cs`
 - `AuditLog.API/AuditLog.API/Controllers/AuditRetentionController.cs`
 - `AuditLog.API/AuditLog.API/Program.cs`
-- `AuditLog.Tests/AuditLog.Tests/ApiKeyAuthorizationTests.cs`
+- `AuditLog.Tests/AuditLog.Tests/JwtAuthorizationTests.cs`
 - `AuditLog.Tests/AuditLog.Tests/AuditEventQueryServiceTests.cs`
 - `AuditLog.Tests/AuditLog.Tests/AuditEventWriterServiceTests.cs`
 - `AuditLog.Tests/AuditLog.Tests/AuditHashingServiceTests.cs`
@@ -464,7 +464,7 @@ were made for this testing task.
 **Files changed in `c225bd3`:**
 
 - `AuditLog.Tests/AuditLog.Tests/ApiControllerTests.cs`
-- `AuditLog.Tests/AuditLog.Tests/ApiKeyAuthorizationTests.cs`
+- `AuditLog.Tests/AuditLog.Tests/JwtAuthorizationTests.cs`
 - `AuditLog.Tests/AuditLog.Tests/AuditScenarioBServiceTests.cs`
 - `AuditLog.Tests/AuditLog.Tests/ComplianceReportServiceTests.cs`
 - `AuditLog.Tests/AuditLog.Tests/TestResults/151824fc-5b67-43fa-9032-8b85c08ec791/coverage.cobertura.xml`
@@ -590,7 +590,7 @@ and `AUDITLOG_SQLSERVER_ADMIN_CONNECTION_STRING` to be set.
 **Files changed:**
 
 - `AuditLog.API/AuditLog.API/Controllers/HealthController.cs`
-- `AuditLog.Tests/AuditLog.Tests/ApiKeyAuthorizationTests.cs`
+- `AuditLog.Tests/AuditLog.Tests/JwtAuthorizationTests.cs`
 - `AuditLog.Tests/AuditLog.Tests/AuditLog.Tests.csproj`
 - `AuditLog.Tests/AuditLog.Tests/SqlServerApiIntegrationTests.cs` (added)
 - `README.md`
@@ -727,6 +727,39 @@ HTTP 409. Other endpoints remain unchanged.
 **Validation:** Solution build passed. Default suite passed
 **129 tests**, with **11 SQL Server integration tests skipped**. The SQL
 Server integration filter passed **11 tests**, 0 failed, 0 skipped.
+
+### 17. ASP.NET Core API rate limiting
+
+**Date / commit:** 2026-11-28; no commit at the time of this update.
+
+**Task request summary:** Add fixed-window rate limiting to
+`POST /auth/token` and `/api/*`, while leaving health and documentation routes
+unlimited.
+
+**AI contribution:** Added built-in ASP.NET Core fixed-window policies to
+`Program.cs`, applied the strict token policy to `AuthController`, and applied
+the general API policy to API controllers. Added `/health` as an alternate
+health route. Added ProblemDetails 429 responses and `Retry-After: 60` for
+token throttling. No rate-limit dictionary or database schema was added.
+
+**Engineer decisions:** The implementation preserves JWT authentication,
+account checks, idempotency, and hash-chain behavior. `/health`,
+`/api/health/database`, `/openapi/*`, and Scalar routes are not rate-limited.
+
+**Validation:** Solution build passed with 0 warnings and 0 errors. Default
+suite passed **129 tests**, with **11 SQL tests skipped**. Live verification:
+
+- `POST /auth/token`: requests 1–5 allowed; request 6 returned 429 with
+  `Retry-After: 60`.
+- Authenticated `/api/audit-events`: requests 1–100 returned 200; request 101
+  returned 429 with `application/problem+json`.
+- Unauthenticated `/api/audit-events`: requests 1–20 returned 401; request 21
+  returned 429.
+- `/health`: 20 requests returned 200; none were rate-limited.
+
+**Files changed:** `Program.cs`, `AuthController.cs`, `HealthController.cs`,
+API controller rate-limit attributes, `JwtAuthorizationTests.cs`, and
+`README.md`.
 
 ## Current pending validation
 
