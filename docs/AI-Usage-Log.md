@@ -663,7 +663,7 @@ passed. No application tests were run for this documentation-only update.
 
 ### 15. Local JWT authentication and permission authorization
 
-**Date / commit:** 2026-11-28; no commit at the time of this update.
+**Date / commit:** 2026-11-28; `0975400` — Replaced API Key authentication with Local JWT authentication.
 
 **Task request summary:** Replace the shared API-key normal authentication
 fallback with local JWT Bearer authentication, add demo token issuance,
@@ -699,7 +699,7 @@ security metadata in `/openapi/v1.json`.
 
 ### 16. Idempotency support for audit-event creation
 
-**Date / commit:** 2026-11-28; no commit at the time of this update.
+**Date / commit:** 2026-11-28; `5fb8779` — Added Idempotency support to POST /api/audit-events.
 
 **Task request summary:** Add idempotency support only to
 `POST /api/audit-events`.
@@ -724,13 +724,14 @@ HTTP 409. Other endpoints remain unchanged.
 `AuditEventQueryServiceTests.cs`, `ComplianceReportServiceTests.cs`,
 `SqlServerApiIntegrationTests.cs`, `README.md`, and `Scenario-A.md`.
 
-**Validation:** Solution build passed. Default suite passed
-**129 tests**, with **11 SQL Server integration tests skipped**. The SQL
-Server integration filter passed **11 tests**, 0 failed, 0 skipped.
+**Validation:** Solution build passed. Later default suite verification passed
+**132 tests**, with **11 SQL Server integration tests skipped**. The SQL
+integration suite had 11 opt-in methods but was not rerun after the latest
+filtering, validation, and ProblemDetails commits.
 
 ### 17. ASP.NET Core API rate limiting
 
-**Date / commit:** 2026-11-28; no commit at the time of this update.
+**Date / commit:** 2026-11-28; `2a15418` — Added Rate Limiting to auth and API endpoints.
 
 **Task request summary:** Add fixed-window rate limiting to
 `POST /auth/token` and `/api/*`, while leaving health and documentation routes
@@ -746,8 +747,9 @@ token throttling. No rate-limit dictionary or database schema was added.
 account checks, idempotency, and hash-chain behavior. `/health`,
 `/api/health/database`, `/openapi/*`, and Scalar routes are not rate-limited.
 
-**Validation:** Solution build passed with 0 warnings and 0 errors. Default
-suite passed **129 tests**, with **11 SQL tests skipped**. Live verification:
+**Validation:** Solution build passed with 0 warnings and 0 errors. Later
+default suite verification passed **132 tests**, with **11 SQL tests skipped**.
+Live verification:
 
 - `POST /auth/token`: requests 1–5 allowed; request 6 returned 429 with
   `Retry-After: 60`.
@@ -760,6 +762,78 @@ suite passed **129 tests**, with **11 SQL tests skipped**. Live verification:
 **Files changed:** `Program.cs`, `AuthController.cs`, `HealthController.cs`,
 API controller rate-limit attributes, `JwtAuthorizationTests.cs`, and
 `README.md`.
+
+### 18. Audit-event pagination, filtering, and sorting
+
+**Date / commit:** 2026-11-28; `ad7b27e` — Added pagination, filtering & sorting for audit events list.
+
+**Task request summary:** Add SQL-backed filtering and sorting to
+`GET /api/audit-events` while preserving JWT authorization, pagination, and
+hash-chain behavior.
+
+**AI contribution:** Added `accountId`, `action`, `search`, `from`, `to`,
+`sortBy`, `sortDir`, and canonical `page`/`pageSize` query binding. Added
+`totalPages` to the response and implemented filtering and sorting in the SQL
+repository. Preserved `pageNumber` as a backward-compatible query alias.
+
+**Engineer decisions:** Invalid `sortBy` values default to `createdAt`; only
+`sortDir=asc` produces ascending order. The account filter is constrained to
+the JWT account claim unless the administrator permission is present.
+
+**Files changed:** Audit event query DTO/result models, controller and service,
+SQL repository, and focused controller/query tests.
+
+**Validation:** The build passed with 0 warnings and 0 errors. Focused
+filtering/controller tests passed **32 tests**. Live SQL-backed verification
+confirmed account, action, date, search, and invalid-sort fallback behavior.
+
+### 19. Health endpoint split
+
+**Date / commit:** 2026-11-28; separate health correction was completed after
+the rate-limiter commit and is represented by the subsequent implementation
+state, with no separate commit hash verified in the available history.
+
+**Task request summary:** Split the public health endpoint from the database
+health check and remove rate limiting and authentication from `/health`.
+
+**AI contribution:** Added `GET /health` as a public no-database health
+response and retained `GET /health/database` as the existing `SELECT 1`
+database check. Applied `AllowAnonymous` and `DisableRateLimiting` to the health
+controller.
+
+**Engineer decisions:** `/health` is infrastructure-oriented and must remain
+unlimited and unauthenticated. Database health behavior was not otherwise
+changed.
+
+**Files changed:** `AuditLog.API/AuditLog.API/Controllers/HealthController.cs`.
+
+**Validation:** Live verification returned HTTP 200 for 20 `/health` requests;
+none were rate-limited.
+
+### 20. Central validation and ProblemDetails
+
+**Date / commit:** 2026-11-28; `16ab534` — Added validation and ProblemDetails for all APIs.
+
+**Task request summary:** Add DataAnnotations validation and consistent
+ProblemDetails for controller and global error responses.
+
+**AI contribution:** Added `AddProblemDetails`, an invalid-model-state factory,
+`IExceptionHandler`, shared ProblemDetails construction, audit-event and
+token DTO validation, JWT 401/403 normalization, and controller status mapping.
+No database, JWT, hash-chain, pagination, filtering, sorting, or idempotency
+logic was intentionally changed.
+
+**Engineer decisions:** Validation types use
+`urn:audit-log-service:error:validation`. Internal exceptions are logged
+server-side and clients receive generic HTTP 500 details without stack traces
+or database error text.
+
+**Files changed:** ProblemDetails factory, audit-event/token DTOs,
+controllers, `Program.cs`, and controller tests.
+
+**Validation:** Build passed with 0 warnings and 0 errors. Default suite
+passed **132 tests**, with **11 SQL integration tests skipped**. Live checks
+verified 400, 401, 403, and 404 ProblemDetails responses.
 
 ## Current pending validation
 

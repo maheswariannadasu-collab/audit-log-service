@@ -79,9 +79,10 @@ or sign chain checkpoints with a separately protected key.
 
 ## Database setup
 
-Apply scripts `001` through `006` in order. Script `004` adds the
+Apply scripts `001` through `007` in order. Script `004` adds the
 redacted-content hash used by verification and export; script `006` adds
-server-verified JWT actor attribution. No script removes old redaction values
+server-verified JWT actor attribution; script `007` adds audit-event
+idempotency storage. No script removes old redaction values
 from backups or transaction logs.
 
 ## Validation
@@ -97,7 +98,7 @@ the tampering.
 
 Run the integration suite as documented in
 [Test-Coverage.md](Test-Coverage.md). The engineer confirmed migrations
-`001`–`004` are applied to the target database and Scenario B operations were
+`001`–`004` were historically confirmed applied to the target database and Scenario B operations were
 validated against SQL Server.
 
 ## Status and remaining limitations

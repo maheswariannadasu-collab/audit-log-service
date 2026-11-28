@@ -43,6 +43,9 @@ protected by local JWT Bearer authentication and named permission policies.
 - The compliance report route checks JWT `accountId` claim assignment.
 - Secrets are supplied through configuration and are not committed.
 - Cancellation support for asynchronous operations.
+- Fixed-window ASP.NET Core rate limiting protects token issuance and `/api/*`.
+- `/health` is public and excluded from rate limiting.
+- DataAnnotations and a global exception handler provide consistent ProblemDetails.
 
 The JWT implementation is a local OIDC-compatible demonstration. Production
 should replace claim-based account mapping and local signing-key configuration

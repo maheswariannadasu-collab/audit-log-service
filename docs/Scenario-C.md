@@ -103,7 +103,8 @@ and date-range handling, and JWT permission/account assignment behavior.
 SQL Server integration tests exercise the report endpoint against persisted
 account events, including date filtering and pagination. The engineer confirmed
 Scenario C was also tested against the target SQL Server database and that
-migrations `001`–`004` have been applied. See
+migrations `001`–`004` were historically confirmed applied. Scripts `006` and
+`007` have not been separately confirmed against the target database. See
 [Test-Coverage.md](Test-Coverage.md) for the integration-test command and
 results.
 

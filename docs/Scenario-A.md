@@ -19,7 +19,7 @@ queries, and detect changes to stored events through hash-chain verification.
 |---|---|
 | `POST /api/audit-events` | Append an event with event type, actor, resource, timestamp, and JSON-object payload. |
 | `GET /api/audit-events/{id}` | Retrieve one event by ID. |
-| `GET /api/audit-events` | Query by any combination of `actorId`, `resourceType`, `resourceId`, `eventType`, `fromUtc`, and `toUtc`. |
+| `GET /api/audit-events` | Filter and sort with account, action, search, date, actor/resource/event fields, then paginate. |
 | `GET /audit/verify` | Verify the full chain; returns `200` when intact and `409` with the first failure when invalid. |
 | `GET /api/audit-integrity/verify` | Existing verification route retained for compatibility. |
 
@@ -39,10 +39,17 @@ permission claims:
 - Read/query: `audit.events.read`
 - Integrity verification: `audit.integrity.verify`
 
-Query pagination uses `pageNumber` (default `1`) and `pageSize` (default `50`,
-maximum `100`). The response includes `items`, `totalCount`, `pageNumber`, and
-`pageSize`. Invalid page values, overlong filters, and a `fromUtc` value that
-is not earlier than `toUtc` are rejected with `400`.
+Query pagination uses `page` (default `1`) and `pageSize` (default `50`,
+maximum `100`). The legacy `pageNumber` query name remains accepted.
+The response includes `items`, `totalCount`, `pageNumber`, `pageSize`, and
+`totalPages`.
+
+SQL filtering supports `accountId`, `action`, `search`, `from`, `to`,
+`actorId`, `resourceType`, `resourceId`, `eventType`, `fromUtc`, and `toUtc`.
+`sortBy` supports `createdAt`, `action`, and `accountId`; invalid values
+default to `createdAt`. `sortDir=asc` selects ascending order; every other
+value defaults to descending. Invalid pagination or filter values return HTTP
+400 ProblemDetails.
 
 ## Hash-chain design
 
@@ -83,9 +90,14 @@ detection of a changed payload. SQL Server integration tests also cover event
 creation, retrieval, filtered/paginated querying, both verification routes, and
 detection of direct database payload tampering.
 
+The API also uses DataAnnotations validation for audit-event and query DTOs,
+global ProblemDetails responses for 400/401/403/404/409/429/500, and fixed-window
+rate limiting. The public `/health` endpoint performs no database call and is
+not rate limited; `/health/database` performs the existing `SELECT 1` check.
+
 Run the integration suite as documented in
 [Test-Coverage.md](Test-Coverage.md). The engineer confirmed the target
-database has migrations `001`–`004` applied and Scenario A was tested against
+database historically had migrations `001`–`004` confirmed applied and Scenario A was tested against
 SQL Server.
 
 Concurrent database-writer stress testing and direct database permission

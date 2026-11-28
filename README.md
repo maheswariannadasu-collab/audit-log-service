@@ -19,6 +19,8 @@ The system is designed to:
 - Detect unauthorized database modifications.
 - Support retention, redaction, and bulk export.
 - Provide account-scoped compliance reports to authorized readers.
+- Support SQL-backed filtering, sorting, and pagination for audit events.
+- Provide consistent ProblemDetails responses and fixed-window rate limiting.
 - Document assumptions and engineering decisions for compliance requirements.
 
 ## 2. Technology Stack
@@ -359,7 +361,8 @@ dotnet build
 dotnet run --project AuditLog.API
 ```
 
-Open Swagger to explore the available APIs.
+Open Scalar at the development route `/scalar` or retrieve `/openapi/v1.json`
+to explore the available APIs.
 
 ## 7. API Controllers
 
@@ -380,6 +383,22 @@ Example working endpoint:
 GET /api/audit-events/1?id=1
 ```
 
+Audit-event list query examples:
+
+```http
+GET /api/audit-events?accountId=ACC123&page=1&pageSize=50&sortBy=createdAt&sortDir=desc
+GET /api/audit-events?action=DEPOSIT&sortDir=asc
+GET /api/audit-events?from=2026-01-01&to=2026-01-31&search=Ravi
+```
+
+Supported list parameters are `accountId`, `action`, `search`, `from`, `to`,
+`actorId`, `resourceType`, `resourceId`, `eventType`, `fromUtc`, `toUtc`,
+`sortBy`, `sortDir`, `page`, and `pageSize`. `sortBy` accepts `createdAt`,
+`action`, or `accountId`; invalid values default to `createdAt desc`.
+`page` defaults to 1, `pageSize` defaults to 50 and is capped at 100.
+The response includes `items`, `totalCount`, `pageNumber`, `pageSize`, and
+`totalPages`.
+
 The current controller routes are covered by the authorization tests; see
 [Test-Coverage.md](docs/Test-Coverage.md) for the verified test results.
 
@@ -396,6 +415,16 @@ The API uses the built-in ASP.NET Core fixed-window rate limiter:
 Exceeding a limit returns HTTP 429. Token limiting includes `Retry-After: 60`;
 API limiting uses a ProblemDetails JSON response.
 
+### Validation and Error Responses
+
+The API uses ASP.NET Core `[ApiController]` DataAnnotations validation and a
+consistent ProblemDetails-style response for validation, authentication,
+authorization, not-found, conflict, rate-limit, service-unavailable, and
+unhandled server errors.
+
+Unhandled exceptions are converted to generic HTTP 500 responses. Stack traces,
+SQL details, and internal exception messages are not returned to clients.
+
 ## 8. Testing Strategy
 
 ### Unit Testing
@@ -410,8 +439,10 @@ API limiting uses a ProblemDetails JSON response.
 
 ### API Request Testing
 - HTTP-level authorization and request-model validation using the test server.
-- Missing and invalid JWTs across the Scenario A, B, and C endpoints,
-  including database health.
+- Missing and invalid JWTs across protected Scenario A, B, and C endpoints.
+- `/health` is public and does not perform a database check.
+- `/health/database` performs the SQL `SELECT 1` health check and is not
+  protected or rate limited.
 - Database-health failure response when SQL Server is unavailable.
 
 ### SQL Server Integration Testing
@@ -435,8 +466,7 @@ dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj
 
 The admin connection must connect to `master` and have permission to create
 and drop databases. Without both environment variables, the 11 SQL Server
-integration tests are skipped. The latest full run with integration enabled
-passed all 140 tests; see [Test-Coverage.md](docs/Test-Coverage.md) for details.
+integration tests are skipped.
 
 ### Security Testing
 - SQL database tampering detection is covered by hash-chain integration tests.
@@ -515,7 +545,7 @@ The following areas remain limitations or require further validation:
 | Scenario B – Retention, Redaction and Export | Implemented; SQL Server integration tests passed |
 | Scenario C – Compliance Reporting | Implemented; SQL Server integration tests passed |
 | Architecture Documentation | Prepared |
-| Automated Testing | Unit and SQL Server integration tests; latest full run: 140 passed |
+| Automated Testing | Unit tests and opt-in SQL Server integration tests; latest default run: 132 passed |
 | Azure Deployment | Planned |
 
 ## 14. Author and Ownership

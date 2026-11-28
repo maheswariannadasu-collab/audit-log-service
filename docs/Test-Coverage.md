@@ -2,16 +2,16 @@
 
 ## Latest verified test run
 
-- Verified: 2026-11-27
+- Verified: 2026-11-28
 - Target framework: .NET 10
 - SQL Server: LocalDB `(localdb)\MSSQLLocalDB`
-- SQL integration methods: 11 passed, 0 failed, 0 skipped
-- Full suite with integration enabled: **140 passed, 0 failed, 0 skipped**
-- Full suite without integration opt-in: **129 passed, 0 failed, 11 skipped**
+- SQL integration suite: **11 methods**; not rerun after the latest
+  filtering, sorting, validation, and ProblemDetails commits
+- Latest default suite: **132 passed, 0 failed, 11 skipped**
 
 The integration tests use a real SQL Server database. The fixture creates a
 uniquely named disposable database (`AuditLogIntegration_<id>`), applies
-database scripts `001`–`006`, runs the tests, and drops the database afterward.
+database scripts `001`–`007`, runs the tests, and drops the database afterward.
 The admin connection's initial catalog is `master` only so the fixture can
 create and drop databases. Tests do not run against `master` or the
 application's `AuditLogDB` database. The disposable test database was verified
@@ -57,17 +57,18 @@ uses the real API and SQL repositories. It covers:
 - Account-scoped compliance reporting with SQL-backed date filtering and
   pagination.
 
-The engineer also confirmed that migrations `001`–`004` are applied to the
+The engineer previously confirmed migrations `001`–`004` are applied to the
 target database and that Scenarios A, B, and C, JWT access, retention,
 redaction, export, and database tampering detection have been validated
 against SQL Server. This is recorded as engineer-confirmed validation; no
-separate target-database run log was supplied.
+separate target-database run log was supplied for migrations `006` or `007`
+or for the latest filtering/validation implementation.
 
 ## Recorded coverage collection
 
 The percentages below are from the earlier **132-test** coverage run, before
 the SQL Server integration tests were added. Coverage has not yet been
-re-collected for the latest 140-test run; these figures therefore do not
+re-collected for the latest 132-test default suite; these figures therefore do not
 include the new SQL integration test execution.
 
 | Assembly | Line coverage | Branch coverage |
