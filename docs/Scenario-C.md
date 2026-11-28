@@ -14,9 +14,10 @@ account and date range, and limit report access to authorized users.
   new account activity types are not silently omitted.
 - Report date filters are optional; when supplied, `fromUtc` is inclusive and
   `toUtc` is exclusive.
-- This local assessment has no configured identity provider. A configuration-
-  supplied API key protects the Scenario A, B, and C API endpoints; production
-  should use the organization's identity provider and user-level authorization.
+- This local assessment uses local JWTs with OIDC-compatible claims. It does
+  not connect to an external identity provider. Production should replace local
+  signing and claim-based account mapping with the organization identity
+  provider and a database-backed assignment lookup.
 
 ## Implementation
 
@@ -33,30 +34,30 @@ first). An account with no matching audit events returns an empty page.
 
 ### Access control
 
-All Scenario A, B, and C API controllers require authentication. Callers must
-provide the `X-Compliance-Api-Key` header. The key is read from the
-`ComplianceReporting:ApiKey` configuration value. For local Visual Studio
-development, store it with User Secrets:
+All Scenario A, B, and C API controllers require JWT Bearer authentication.
+The local token endpoint is `POST /auth/token`. Supported demo users are
+`AuditWriter`, `Auditor`, `ComplianceReader`, `SecurityOperator`, and
+`Administrator`.
 
 ```powershell
-dotnet user-secrets set "ComplianceReporting:ApiKey" "<your-random-32-plus-character-key>" --project AuditLog.API\AuditLog.API\AuditLog.API.csproj
+dotnet user-secrets set "Jwt:SigningKey" "<random-key-of-at-least-32-characters>" --project AuditLog.API\AuditLog.API\AuditLog.API.csproj
 ```
 
-The API launch profiles use the Development environment, so ASP.NET Core loads
-the secret automatically. The `ComplianceReporting__ApiKey` environment
-variable is also supported for command-line runs. Keys shorter than 32
-characters are rejected; the comparison uses fixed-time hash comparison.
+The local mode validates issuer, audience, signature, expiry, and lifetime
+with zero clock skew. The issuer and audience come from `Jwt:Issuer` and
+`Jwt:Audience`; `Jwt:Authority` remains configurable for future migration.
+Requests without a valid token receive HTTP 401. A valid token without
+`audit.reports.read` receives HTTP 403.
 
-Requests without a valid configured key receive HTTP 401. The configured key
-is a shared local-assessment credential; it does not identify individual
-regulators or provide per-user audit attribution. Do not commit the key to
-source control.
+For account access, the route account ID must equal the JWT `accountId` claim
+unless the token has `audit.accounts.manage`. The report service always receives
+the authorized route account ID as its account filter.
 
 ### Example request
 
 ```http
 GET /api/compliance-reports/accounts/ACCOUNT100/access?fromUtc=2026-01-01T00:00:00Z&toUtc=2026-02-01T00:00:00Z&pageNumber=1&pageSize=50
-X-Compliance-Api-Key: <configured-key>
+Authorization: Bearer <local-JWT>
 ```
 
 ### Example response
@@ -97,7 +98,7 @@ For the API to return useful reports, account activity must be written with
 
 Unit tests verify account scoping, the `ACCOUNT` resource-type constraint,
 date-bound and pagination forwarding, report-field projection, invalid account
-and date-range handling, and API-key acceptance/rejection behavior.
+and date-range handling, and JWT permission/account assignment behavior.
 
 SQL Server integration tests exercise the report endpoint against persisted
 account events, including date filtering and pagination. The engineer confirmed
@@ -108,9 +109,7 @@ results.
 
 ## Remaining production considerations
 
-The API key is intentionally a small local-assessment access gate, not a
-replacement for an identity provider. The shared key also grants access to
-Scenario A and B operations, including writes, retention, and redaction.
-Production deployment should use an identity provider, assign least-privilege
-roles and account scopes, store secrets in a secret manager, and audit report
-access by the authenticated user.
+The JWT implementation is intentionally local and claim-based for this
+assignment. Production deployment should use an identity provider, replace
+the claim mapping with database-backed account assignments, store secrets in
+a secret manager, and separate read/write permissions.

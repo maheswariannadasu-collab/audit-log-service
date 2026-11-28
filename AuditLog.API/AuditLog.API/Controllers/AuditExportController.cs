@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AuditLog.API.Controllers
 {
-    [Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
     [ApiController]
     [Route("api/audit-export")]
     public class AuditExportController : ControllerBase
@@ -18,6 +17,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpGet("json")]
+        [Authorize(Policy = JwtPolicyNames.ExportRead)]
         public async Task<IActionResult> ExportJson(
             DateTime? fromUtc,
             DateTime? toUtc,
@@ -42,6 +42,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpGet("csv")]
+        [Authorize(Policy = JwtPolicyNames.ExportRead)]
         public async Task<IActionResult> ExportCsv(
             DateTime? fromUtc,
             DateTime? toUtc,
@@ -66,6 +67,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpGet("bundle")]
+        [Authorize(Policy = JwtPolicyNames.ExportRead)]
         public async Task<IActionResult> ExportBundle(
             string? actorId,
             string? resourceId,

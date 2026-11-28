@@ -4,38 +4,112 @@ using AuditLog.BLL.Services;
 using AuditLog.API.Auth;
 using AuditLog.DAL.Data;
 using AuditLog.DAL.Repositories;
-using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+});
+
+var jwtMode = builder.Configuration["Jwt:Mode"] ?? "Local";
+var issuer = builder.Configuration["Jwt:Issuer"] ?? "AuditLog.Local";
+var audience = builder.Configuration["Jwt:Audience"] ?? "audit-log-api";
+
 builder.Services
-    .AddAuthentication(options =>
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        options.DefaultAuthenticateScheme =
-            ComplianceApiKeyDefaults.SchemeName;
-        options.DefaultChallengeScheme =
-            ComplianceApiKeyDefaults.SchemeName;
-    })
-    .AddScheme<
-        AuthenticationSchemeOptions,
-        ComplianceApiKeyAuthenticationHandler>(
-            ComplianceApiKeyDefaults.SchemeName,
-            _ => { });
+        options.MapInboundClaims = false;
+        options.RequireHttpsMetadata = false;
+
+        if (string.Equals(jwtMode, "Local",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            var signingKey =
+                builder.Configuration["Jwt:SigningKey"];
+            if (string.IsNullOrWhiteSpace(signingKey))
+            {
+                throw new InvalidOperationException(
+                    "Jwt:SigningKey must be configured in user secrets or configuration.");
+            }
+
+            options.TokenValidationParameters =
+                new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuer = issuer,
+                    ValidateAudience = true,
+                    ValidAudience = audience,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(signingKey)),
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero,
+                    NameClaimType = "preferred_username",
+                    RoleClaimType = "roles"
+                };
+        }
+        else
+        {
+            var authority = builder.Configuration["Jwt:Authority"];
+            if (string.IsNullOrWhiteSpace(authority))
+            {
+                throw new InvalidOperationException(
+                    "Jwt:Authority must be configured for non-local JWT mode.");
+            }
+
+            options.Authority = authority;
+            options.Audience = audience;
+            options.RequireHttpsMetadata = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = issuer,
+                ValidateAudience = true,
+                ValidAudience = audience,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero,
+                NameClaimType = "preferred_username",
+                RoleClaimType = "roles"
+            };
+        }
+    });
+
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy(
-        ComplianceApiKeyDefaults.PolicyName,
-        policy => policy
-            .AddAuthenticationSchemes(
-                ComplianceApiKeyDefaults.SchemeName)
-            .RequireAuthenticatedUser()
-            .RequireRole(ComplianceApiKeyDefaults.RoleName));
+    void PermissionPolicy(string name, string permission)
+    {
+        options.AddPolicy(name, policy =>
+        {
+            policy.AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme);
+            policy.RequireAuthenticatedUser();
+            policy.RequireClaim("permissions", permission);
+        });
+    }
+
+    PermissionPolicy(JwtPolicyNames.EventsRead,
+        JwtPermissions.EventsRead);
+    PermissionPolicy(JwtPolicyNames.EventsWrite,
+        JwtPermissions.EventsWrite);
+    PermissionPolicy(JwtPolicyNames.IntegrityVerify,
+        JwtPermissions.IntegrityVerify);
+    PermissionPolicy(JwtPolicyNames.RetentionManage,
+        JwtPermissions.RetentionManage);
+    PermissionPolicy(JwtPolicyNames.RedactionManage,
+        JwtPermissions.RedactionManage);
+    PermissionPolicy(JwtPolicyNames.ExportRead,
+        JwtPermissions.ExportRead);
+    PermissionPolicy(JwtPolicyNames.ReportsRead,
+        JwtPermissions.ReportsRead);
 });
 
 // Read database connection string

@@ -28,6 +28,8 @@ namespace AuditLog.DAL.Repositories
                     A.Id,
                     A.EventType,
                     A.ActorId,
+                    A.CreatedBySubject,
+                    A.CreatedByDisplayName,
                     A.ResourceType,
                     A.ResourceId,
                     COALESCE(R.RedactedPayloadJson, A.PayloadJson) AS PayloadJson,
@@ -83,18 +85,24 @@ namespace AuditLog.DAL.Repositories
                     Id = reader.GetInt64(0),
                     EventType = reader.GetString(1),
                     ActorId = reader.GetString(2),
-                    ResourceType = reader.GetString(3),
-                    ResourceId = reader.GetString(4),
-                    Payload = ParsePayload(reader.GetString(5)),
-                    EventTimestampUtc = reader.GetDateTime(6),
-                    IsArchived = reader.GetBoolean(7),
-                    ContentHash = reader.GetString(8),
-                    RedactedContentHash = reader.IsDBNull(9)
+                    CreatedBySubject = reader.IsDBNull(3)
+                        ? string.Empty
+                        : reader.GetString(3),
+                    CreatedByDisplayName = reader.IsDBNull(4)
+                        ? string.Empty
+                        : reader.GetString(4),
+                    ResourceType = reader.GetString(5),
+                    ResourceId = reader.GetString(6),
+                    Payload = ParsePayload(reader.GetString(7)),
+                    EventTimestampUtc = reader.GetDateTime(8),
+                    IsArchived = reader.GetBoolean(9),
+                    ContentHash = reader.GetString(10),
+                    RedactedContentHash = reader.IsDBNull(11)
                         ? null
-                        : reader.GetString(9),
-                    PreviousHash = reader.GetString(10),
-                    RecordHash = reader.GetString(11),
-                    IsRedacted = reader.GetBoolean(12)
+                        : reader.GetString(11),
+                    PreviousHash = reader.GetString(12),
+                    RecordHash = reader.GetString(13),
+                    IsRedacted = reader.GetBoolean(14)
                 });
             }
 

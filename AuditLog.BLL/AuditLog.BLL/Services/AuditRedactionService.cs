@@ -84,6 +84,8 @@ namespace AuditLog.BLL.Services
             {
                 EventType = auditEventRecord.EventType,
                 ActorId = auditEventRecord.ActorId,
+                CreatedBySubject = auditEventRecord.CreatedBySubject,
+                CreatedByDisplayName = auditEventRecord.CreatedByDisplayName,
                 ResourceType = auditEventRecord.ResourceType,
                 ResourceId = auditEventRecord.ResourceId,
                 EventTimestampUtc = new DateTimeOffset(

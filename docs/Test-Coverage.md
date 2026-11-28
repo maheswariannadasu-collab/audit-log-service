@@ -11,7 +11,7 @@
 
 The integration tests use a real SQL Server database. The fixture creates a
 uniquely named disposable database (`AuditLogIntegration_<id>`), applies
-database scripts `001`–`004`, runs the tests, and drops the database afterward.
+database scripts `001`–`006`, runs the tests, and drops the database afterward.
 The admin connection's initial catalog is `master` only so the fixture can
 create and drop databases. Tests do not run against `master` or the
 application's `AuditLogDB` database. The disposable test database was verified
@@ -43,9 +43,9 @@ dotnet test AuditLog.Tests\AuditLog.Tests\AuditLog.Tests.csproj --filter Categor
 The [integration test suite](../AuditLog.Tests/AuditLog.Tests/SqlServerApiIntegrationTests.cs)
 uses the real API and SQL repositories. It covers:
 
-- Missing and invalid API keys across all 13 controller route/method
+- Missing and invalid JWTs across the protected controller route/method
   combinations, including the database health endpoint.
-- Database health success with a valid API key.
+- Database health success without authentication.
 - Event insertion, retrieval, filtered querying, and SQL-backed pagination.
 - Both integrity verification routes and direct database payload tampering.
 - Retention updates, preservation of current records, and repeat-run
@@ -58,7 +58,7 @@ uses the real API and SQL repositories. It covers:
   pagination.
 
 The engineer also confirmed that migrations `001`–`004` are applied to the
-target database and that Scenarios A, B, and C, API-key access, retention,
+target database and that Scenarios A, B, and C, JWT access, retention,
 redaction, export, and database tampering detection have been validated
 against SQL Server. This is recorded as engineer-confirmed validation; no
 separate target-database run log was supplied.
@@ -96,5 +96,5 @@ effect on the DAL percentages.
   the integration suite.
 - The export proof is recomputed in tests, but bundles are not digitally
   signed or externally anchored.
-- Shared API-key authentication does not provide per-user identity,
-  account-level authorization, or separate read/write permissions.
+- Shared claim-based account assignment does not provide a production
+  database-backed account lookup or external identity-provider validation.

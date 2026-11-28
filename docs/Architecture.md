@@ -14,8 +14,7 @@ The application follows a layered architecture.
 Client → API Controller → BLL Service → DAL Repository → SQL Server
 
 Scenario A, B, and C controller endpoints follow the same flow and are
-protected by the configuration-backed API-key authentication scheme before
-their controllers are invoked.
+protected by local JWT Bearer authentication and named permission policies.
 
 ## Key Design Decisions
 
@@ -39,10 +38,12 @@ their controllers are invoked.
 - Hash chaining for tamper detection.
 - Separate storage for redacted data.
 - Account and date scoping for compliance reports.
-- Configuration-supplied API key required for Scenario A, B, and C API routes.
+- JWT issuer, audience, signature, and lifetime validation is required.
+- Permission claims control endpoint access independently of role-only checks.
+- The compliance report route checks JWT `accountId` claim assignment.
 - Secrets are supplied through configuration and are not committed.
 - Cancellation support for asynchronous operations.
 
-The shared API key is a local assessment mechanism. Production should use an
-identity provider and regulator-specific authorization. The current key does
-not identify individual regulators or enforce account-level entitlements.
+The JWT implementation is a local OIDC-compatible demonstration. Production
+should replace claim-based account mapping and local signing-key configuration
+with an external identity provider and a database-backed account assignment.

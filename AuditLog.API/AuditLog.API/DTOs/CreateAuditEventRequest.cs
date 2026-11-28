@@ -10,10 +10,6 @@ namespace AuditLog.API.DTOs
         public string EventType { get; init; } = string.Empty;
 
         [Required]
-        [StringLength(150)]
-        public string ActorId { get; init; } = string.Empty;
-
-        [Required]
         [StringLength(100)]
         public string ResourceType { get; init; } = string.Empty;
 

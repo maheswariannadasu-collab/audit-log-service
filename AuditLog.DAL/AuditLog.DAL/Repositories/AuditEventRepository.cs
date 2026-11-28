@@ -104,6 +104,8 @@ namespace AuditLog.DAL.Repositories
                 (
                     EventType,
                     ActorId,
+                    CreatedBySubject,
+                    CreatedByDisplayName,
                     ResourceType,
                     ResourceId,
                     PayloadJson,
@@ -117,6 +119,8 @@ namespace AuditLog.DAL.Repositories
                 (
                     @EventType,
                     @ActorId,
+                    @CreatedBySubject,
+                    @CreatedByDisplayName,
                     @ResourceType,
                     @ResourceId,
                     @PayloadJson,
@@ -136,6 +140,14 @@ namespace AuditLog.DAL.Repositories
                 insertCommand.Parameters.Add(
                     "@ActorId", SqlDbType.NVarChar, 150)
                     .Value = auditEvent.ActorId;
+
+                insertCommand.Parameters.Add(
+                    "@CreatedBySubject", SqlDbType.NVarChar, 150)
+                    .Value = auditEvent.CreatedBySubject;
+
+                insertCommand.Parameters.Add(
+                    "@CreatedByDisplayName", SqlDbType.NVarChar, 150)
+                    .Value = auditEvent.CreatedByDisplayName;
 
                 insertCommand.Parameters.Add(
                     "@ResourceType", SqlDbType.NVarChar, 100)

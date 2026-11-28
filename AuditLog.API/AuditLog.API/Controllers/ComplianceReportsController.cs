@@ -10,7 +10,7 @@ namespace AuditLog.API.Controllers;
 
 [ApiController]
 [Route("api/compliance-reports")]
-[Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
+[Authorize(Policy = JwtPolicyNames.ReportsRead)]
 public sealed class ComplianceReportsController : ControllerBase
 {
     private readonly IComplianceReportService _reportService;
@@ -32,6 +32,28 @@ public sealed class ComplianceReportsController : ControllerBase
     {
         try
         {
+            var accountIdClaim = User.FindFirst("accountId")?.Value;
+            var subject = User.FindFirst("sub")?.Value;
+            var hasAccountsManage = User.FindAll("permissions")
+                .Any(claim => claim.Value ==
+                    JwtPermissions.AccountsManage);
+
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                return Unauthorized();
+            }
+
+            if (!hasAccountsManage &&
+                !string.Equals(
+                    accountIdClaim,
+                    accountId,
+                    StringComparison.Ordinal))
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    new { message = "The token is not assigned to this account." });
+            }
+
             var report = await _reportService.GetAccountAccessReportAsync(
                 new ComplianceAccessReportQuery
                 {

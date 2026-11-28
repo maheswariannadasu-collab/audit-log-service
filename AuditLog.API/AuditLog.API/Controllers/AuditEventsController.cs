@@ -9,7 +9,6 @@ using System.Text.Json;
 
 namespace AuditLog.API.Controllers
 {
-    [Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
     [ApiController]
     [Route("api/audit-events")]
     public sealed class AuditEventsController : ControllerBase
@@ -26,6 +25,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = JwtPolicyNames.EventsWrite)]
         public async Task<IActionResult> Create(
             [FromBody] CreateAuditEventRequest request,
             CancellationToken cancellationToken)
@@ -46,10 +46,19 @@ namespace AuditLog.API.Controllers
                 return BadRequest("EventTimestampUtc is required.");
             }
 
+            var subject = User.FindFirst("sub")?.Value;
+            var displayName = User.FindFirst("preferred_username")?.Value;
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                return Unauthorized();
+            }
+
             var auditEvent = new AuditEventData
             {
                 EventType = request.EventType,
-                ActorId = request.ActorId,
+                ActorId = subject,
+                CreatedBySubject = subject,
+                CreatedByDisplayName = displayName ?? subject,
                 ResourceType = request.ResourceType,
                 ResourceId = request.ResourceId,
                 EventTimestampUtc =
@@ -73,6 +82,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpGet("{id:long}")]
+        [Authorize(Policy = JwtPolicyNames.EventsRead)]
         public async Task<IActionResult> GetById(
         long id,
         CancellationToken cancellationToken)
@@ -98,6 +108,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = JwtPolicyNames.EventsRead)]
         public async Task<IActionResult> Query(
             [FromQuery] AuditEventQueryRequest request,
             CancellationToken cancellationToken)

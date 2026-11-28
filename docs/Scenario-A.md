@@ -25,11 +25,12 @@ queries, and detect changes to stored events through hash-chain verification.
 
 ## Access control
 
-All Scenario A endpoints require the existing `X-Compliance-Api-Key` header.
-The key is read from `ComplianceReporting:ApiKey`; configure it using the
-User Secrets or environment-variable instructions in
-[Scenario C](Scenario-C.md#access-control). Requests with a missing or invalid
-key receive HTTP 401.
+Scenario A endpoints require JWT Bearer authentication and the matching
+permission claims:
+
+- Create: `audit.events.write`
+- Read/query: `audit.events.read`
+- Integrity verification: `audit.integrity.verify`
 
 Query pagination uses `pageNumber` (default `1`) and `pageSize` (default `50`,
 maximum `100`). The response includes `items`, `totalCount`, `pageNumber`, and

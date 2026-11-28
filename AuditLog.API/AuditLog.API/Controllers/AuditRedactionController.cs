@@ -9,7 +9,6 @@ using System.Text.Json;
 namespace AuditLog.API.Controllers
 {
 
-    [Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
     [ApiController]
     [Route("api/audit-redaction")]
     public class AuditRedactionController : ControllerBase
@@ -23,6 +22,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpPost("preview")]
+        [Authorize(Policy = JwtPolicyNames.RedactionManage)]
         public IActionResult PreviewRedaction(
             [FromBody] JsonElement request)
         {
@@ -47,6 +47,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpPost("apply")]
+        [Authorize(Policy = JwtPolicyNames.RedactionManage)]
         public async Task<IActionResult> ApplyRedaction(
             [FromBody] AuditRedactionRequest request,
             CancellationToken cancellationToken)

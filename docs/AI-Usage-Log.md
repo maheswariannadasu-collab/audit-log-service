@@ -661,11 +661,47 @@ where the history provides no further evidence.
 including commit dates, subjects, and changed paths. `git diff --check`
 passed. No application tests were run for this documentation-only update.
 
+### 15. Local JWT authentication and permission authorization
+
+**Date / commit:** 2026-11-28; no commit at the time of this update.
+
+**Task request summary:** Replace the shared API-key normal authentication
+fallback with local JWT Bearer authentication, add demo token issuance,
+permission-based named policies, claim-based account scoping, JWT actor
+attribution, OpenAPI bearer documentation, and JWT-focused tests.
+
+**AI contribution:** GitHub Copilot-assisted implementation replaced API-key
+authorization in the controllers and startup configuration. Added a local
+`POST /auth/token` endpoint for demo users, JWT issuer/audience/signature/
+lifetime validation with zero clock skew, named permission policies, account
+claim checks for compliance reports, and server-derived event actor fields.
+Added OpenAPI bearer security documentation and updated tests and SQL migration
+setup for actor attribution.
+
+**Engineer decisions:** The implementation remains offline and local, uses
+`Jwt:Mode=Local`, and keeps `Jwt:Authority` configurable for future migration.
+It does not add authorization database tables or external identity-provider
+configuration. The database health endpoint remains publicly accessible.
+The signing key is supplied through configuration or user secrets.
+
+**Files changed:** API startup/auth/controllers/DTOs, JWT test files,
+SQL migration `006_AddAuditActorIdentity.sql`, integration fixture setup,
+and the related README, scenario, coverage, attestation, and AI usage
+documentation.
+
+**Validation:** Solution build passed with 0 warnings and 0 errors. The
+default test suite passed **129 tests**, with **10 SQL Server integration tests
+skipped**. The SQL Server integration filter passed **10 tests** with the
+integration environment enabled. The complete suite with integration enabled
+passed **139 tests**, 0 failed, 0 skipped. A local API run verified
+`POST /auth/token`, anonymous HTTP 401 for a protected endpoint, and Bearer
+security metadata in `/openapi/v1.json`.
+
 ## Current pending validation
 
 - Concurrent SQL Server writer stress testing.
-- Production identity, per-user/account authorization, and least-privilege
-  access policies; the current API key is shared across routes.
+- Production identity-provider integration and database-backed account
+  authorization; this assignment uses JWT account claims.
 - Production deployment and operational validation.
 
 

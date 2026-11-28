@@ -18,15 +18,15 @@ apply.
 
 ## Access control
 
-All Scenario B endpoints require the existing `X-Compliance-Api-Key` header,
-using the same `ComplianceReporting:ApiKey` configuration as Scenario A and C.
-See [Scenario C access control](Scenario-C.md#access-control) for local
-configuration instructions. Requests with a missing or invalid key receive
-HTTP 401.
+Scenario B endpoints require JWT Bearer authentication:
 
-The shared key grants access to all Scenario A, B, and C routes, including
-retention and redaction operations; it does not provide per-user identity or
-separate read/write permissions. Protect it as a privileged secret.
+- Retention: `audit.retention.manage`
+- Redaction preview and apply: `audit.redaction.manage`
+- JSON/CSV/bundle export: `audit.export.read`
+
+Missing or invalid tokens receive HTTP 401. Valid tokens without the required
+permission receive HTTP 403. Read, export, and write permissions remain
+separate.
 
 ## Redaction design and trade-offs
 
@@ -79,9 +79,10 @@ or sign chain checkpoints with a separately protected key.
 
 ## Database setup
 
-Apply scripts `001`, `002`, `003`, then `004` in order. Script `004` adds the
-redacted-content hash used by verification and export. No script removes old
-redaction values from backups or transaction logs.
+Apply scripts `001` through `006` in order. Script `004` adds the
+redacted-content hash used by verification and export; script `006` adds
+server-verified JWT actor attribution. No script removes old redaction values
+from backups or transaction logs.
 
 ## Validation
 

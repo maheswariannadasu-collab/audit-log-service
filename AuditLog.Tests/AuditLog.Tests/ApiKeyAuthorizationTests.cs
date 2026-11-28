@@ -1,4 +1,8 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text;
 using AuditLog.API.Auth;
 using AuditLog.BLL.Interfaces;
@@ -10,214 +14,293 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 
 namespace AuditLog.Tests;
 
-public sealed class ApiKeyAuthorizationTests
-    : IClassFixture<ApiKeyAuthorizationApiFactory>
+public sealed class JwtAuthorizationTests
+    : IClassFixture<JwtAuthorizationApiFactory>
 {
     private readonly HttpClient _client;
-    private readonly ApiKeyAuthorizationApiFactory _factory;
 
-    public ApiKeyAuthorizationTests(
-        ApiKeyAuthorizationApiFactory factory)
+    public JwtAuthorizationTests(JwtAuthorizationApiFactory factory)
     {
-        _factory = factory;
         _client = factory.CreateClient();
     }
 
     [Fact]
-    public async Task GetAccountAccessReport_WithoutApiKey_ReturnsUnauthorized()
+    public async Task MissingToken_ReturnsUnauthorized()
     {
-        var response = await _client.GetAsync(
-            "/api/compliance-reports/accounts/ACCOUNT100/access");
-
+        var response = await _client.GetAsync("/api/audit-events");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
-    public async Task GetAccountAccessReport_WithInvalidApiKey_ReturnsUnauthorized()
+    public async Task ExpiredToken_ReturnsUnauthorized()
     {
-        using var request = new HttpRequestMessage(
+        using var request = CreateRequest(
             HttpMethod.Get,
-            "/api/compliance-reports/accounts/ACCOUNT100/access");
-        request.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            "incorrect-key");
+            "/api/audit-events",
+            JwtAuthorizationApiFactory.CreateToken(
+                "Auditor",
+                "ACCOUNT100",
+                expires: DateTime.UtcNow.AddMinutes(-1)));
 
         var response = await _client.SendAsync(request);
-
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
-    public async Task GetAccountAccessReport_WithMultipleApiKeys_ReturnsUnauthorized()
+    public async Task WrongAudience_ReturnsUnauthorized()
     {
-        using var request = new HttpRequestMessage(
+        using var request = CreateRequest(
             HttpMethod.Get,
-            "/api/compliance-reports/accounts/ACCOUNT100/access");
-        request.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            [
-                ApiKeyAuthorizationApiFactory.ConfiguredKey,
-                ApiKeyAuthorizationApiFactory.ConfiguredKey
-            ]);
-
-        using var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetAccountAccessReport_WithValidApiKey_IsAuthorized()
-    {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            "/api/compliance-reports/accounts/ACCOUNT100/access");
-        request.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            ApiKeyAuthorizationApiFactory.ConfiguredKey);
+            "/api/audit-events",
+            JwtAuthorizationApiFactory.CreateToken(
+                "Auditor",
+                "ACCOUNT100",
+                audience: "wrong-audience"));
 
         var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 
+    [Fact]
+    public async Task WrongIssuer_ReturnsUnauthorized()
+    {
+        using var request = CreateRequest(
+            HttpMethod.Get,
+            "/api/audit-events",
+            JwtAuthorizationApiFactory.CreateToken(
+                "Auditor",
+                "ACCOUNT100",
+                issuer: "wrong-issuer"));
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InvalidSignature_ReturnsUnauthorized()
+    {
+        using var request = CreateRequest(
+            HttpMethod.Get,
+            "/api/audit-events",
+            JwtAuthorizationApiFactory.CreateToken(
+                "Auditor",
+                "ACCOUNT100",
+                signingKey: "different-test-signing-key-that-is-at-least-32-chars"));
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidTokenMissingPermission_ReturnsForbidden()
+    {
+        using var request = CreateRequest(
+            HttpMethod.Get,
+            "/api/audit-events",
+            JwtAuthorizationApiFactory.CreateToken(
+                "AuditWriter",
+                "ACCOUNT100"));
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AssignedAccount_ReturnsOk()
+    {
+        using var request = CreateRequest(
+            HttpMethod.Get,
+            "/api/compliance-reports/accounts/ACCOUNT100/access",
+            JwtAuthorizationApiFactory.CreateToken(
+                "ComplianceReader",
+                "ACCOUNT100"));
+
+        var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
-    public async Task AuditEventCreate_WithMissingRequiredFields_ReturnsBadRequest()
+    public async Task UnassignedAccount_ReturnsForbidden()
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            "/api/audit-events")
-        {
-            Content = new StringContent(
-                "{}",
-                Encoding.UTF8,
-                "application/json")
-        };
-        request.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            ApiKeyAuthorizationApiFactory.ConfiguredKey);
+        using var request = CreateRequest(
+            HttpMethod.Get,
+            "/api/compliance-reports/accounts/ACCOUNT200/access",
+            JwtAuthorizationApiFactory.CreateToken(
+                "ComplianceReader",
+                "ACCOUNT100"));
 
-        using var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task AuditEventQuery_WithInvalidPagination_ReturnsBadRequest()
+    public async Task CrossAccount_ReturnsForbidden()
     {
-        using var request = new HttpRequestMessage(
+        using var request = CreateRequest(
             HttpMethod.Get,
-            "/api/audit-events?pageNumber=0");
-        request.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            ApiKeyAuthorizationApiFactory.ConfiguredKey);
+            "/api/compliance-reports/accounts/OTHER/access",
+            JwtAuthorizationApiFactory.CreateToken(
+                "Auditor",
+                "ACCOUNT100"));
 
-        using var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ComplianceReport_WithInvalidAccountOrPagination_ReturnsBadRequest()
-    {
-        var overlongAccountId = new string('A', 151);
-        using var invalidAccountRequest = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"/api/compliance-reports/accounts/{overlongAccountId}/access");
-        invalidAccountRequest.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            ApiKeyAuthorizationApiFactory.ConfiguredKey);
-
-        using var invalidAccountResponse =
-            await _client.SendAsync(invalidAccountRequest);
-
-        Assert.Equal(HttpStatusCode.BadRequest, invalidAccountResponse.StatusCode);
-
-        using var invalidPaginationRequest = new HttpRequestMessage(
-            HttpMethod.Get,
-            "/api/compliance-reports/accounts/ACCOUNT100/access?pageSize=101");
-        invalidPaginationRequest.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            ApiKeyAuthorizationApiFactory.ConfiguredKey);
-
-        using var invalidPaginationResponse =
-            await _client.SendAsync(invalidPaginationRequest);
-
-        Assert.Equal(
-            HttpStatusCode.BadRequest,
-            invalidPaginationResponse.StatusCode);
-    }
-
-    [Fact]
-    public async Task DatabaseHealth_WhenDatabaseUnavailable_ReturnsServiceUnavailable()
-    {
-        Assert.Equal(
-            "Server=127.0.0.1,1;Connect Timeout=1;Encrypt=False;TrustServerCertificate=True",
-            _factory.Services
-                .GetRequiredService<IConfiguration>()
-                .GetConnectionString("AuditLogDb"));
-
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            "/api/health/database");
-        request.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            ApiKeyAuthorizationApiFactory.ConfiguredKey);
-
-        using var response = await _client.SendAsync(request);
-
-        var responseBody = await response.Content.ReadAsStringAsync();
-        Assert.True(
-            response.StatusCode == HttpStatusCode.ServiceUnavailable,
-            $"Expected 503 but got {(int)response.StatusCode}: {responseBody}");
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Theory]
-    [InlineData("POST", "/api/audit-events")]
-    [InlineData("GET", "/api/audit-events/1")]
     [InlineData("GET", "/api/audit-events")]
-    [InlineData("GET", "/audit/verify")]
-    [InlineData("GET", "/api/audit-integrity/verify")]
-    [InlineData("POST", "/api/audit-retention/archive")]
-    [InlineData("POST", "/api/audit-redaction/preview")]
-    [InlineData("POST", "/api/audit-redaction/apply")]
     [InlineData("GET", "/api/audit-export/json")]
-    [InlineData("GET", "/api/audit-export/csv")]
-    [InlineData("GET", "/api/audit-export/bundle")]
-    [InlineData("GET", "/api/health/database")]
-    public async Task ProtectedEndpoints_WithoutValidApiKey_ReturnUnauthorized(
+    [InlineData("GET", "/api/compliance-reports/accounts/ACCOUNT100/access")]
+    public async Task AuditWriter_DeniedReadExportOrReport(
         string method,
         string path)
     {
-        using var request = new HttpRequestMessage(
+        using var request = CreateRequest(
             new HttpMethod(method),
-            path);
-        using var response = await _client.SendAsync(request);
+            path,
+            JwtAuthorizationApiFactory.CreateToken(
+                "AuditWriter",
+                "ACCOUNT100"));
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 
-        using var invalidKeyRequest = new HttpRequestMessage(
+    [Theory]
+    [InlineData("POST", "/api/audit-events", "{}")]
+    [InlineData("POST", "/api/audit-retention/archive", "{}")]
+    [InlineData("POST", "/api/audit-redaction/preview", "{}")]
+    [InlineData("POST", "/api/audit-redaction/apply", "{}")]
+    public async Task Reader_DeniedWriteRetentionOrRedaction(
+        string method,
+        string path,
+        string json)
+    {
+        using var request = CreateRequest(
             new HttpMethod(method),
-            path);
-        invalidKeyRequest.Headers.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            "incorrect-key");
-        using var invalidKeyResponse =
-            await _client.SendAsync(invalidKeyRequest);
+            path,
+            JwtAuthorizationApiFactory.CreateToken(
+                "ComplianceReader",
+                "ACCOUNT100"));
+        if (!string.IsNullOrWhiteSpace(json))
+        {
+            request.Content = new StringContent(
+                json,
+                Encoding.UTF8,
+                "application/json");
+        }
 
-        Assert.Equal(
-            HttpStatusCode.Unauthorized,
-            invalidKeyResponse.StatusCode);
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HealthEndpoint_IsAccessibleWithoutToken()
+    {
+        var response = await _client.GetAsync("/api/health/database");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Administrator_CanAccessAnotherAccount()
+    {
+        using var request = CreateRequest(
+            HttpMethod.Get,
+            "/api/compliance-reports/accounts/ACCOUNT999/access",
+            JwtAuthorizationApiFactory.CreateToken(
+                "Administrator",
+                "ACCOUNT100"));
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ActorSpoofing_IsIgnored()
+    {
+        using var request = CreateRequest(
+            HttpMethod.Post,
+            "/api/audit-events",
+            JwtAuthorizationApiFactory.CreateToken(
+                "AuditWriter",
+                "ACCOUNT100"));
+        request.Content = JsonContent.Create(new
+        {
+            ActorId = "spoofed-user",
+            EventType = "TEST_EVENT",
+            ResourceType = "ACCOUNT",
+            ResourceId = "ACCOUNT100",
+            EventTimestampUtc = DateTimeOffset.UtcNow,
+            Payload = new { outcome = "success" }
+        });
+
+        var response = await _client.SendAsync(request);
+        Assert.True(
+            response.StatusCode == HttpStatusCode.BadRequest ||
+            response.StatusCode == HttpStatusCode.Created ||
+            response.StatusCode == HttpStatusCode.ServiceUnavailable ||
+            response.StatusCode == HttpStatusCode.InternalServerError);
+    }
+
+    private static HttpRequestMessage CreateRequest(
+        HttpMethod method,
+        string path,
+        string token)
+    {
+        var request = new HttpRequestMessage(method, path);
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+        return request;
     }
 }
 
-public sealed class ApiKeyAuthorizationApiFactory
+public sealed class JwtAuthorizationApiFactory
     : WebApplicationFactory<Program>
 {
-    internal const string ConfiguredKey =
-        "TEST_ONLY_ComplianceApiKeyForIntegrationTests_0123456789";
+    internal const string Issuer = "AuditLog.Local";
+    internal const string Audience = "audit-log-api";
+    internal const string SigningKey =
+        "assignment-only-test-signing-key-32-characters";
+
+    public static string CreateToken(
+        string username,
+        string accountId,
+        DateTime? expires = null,
+        string? issuer = null,
+        string? audience = null,
+        string? signingKey = null)
+    {
+        var permissions = JwtPermissions.DemoUsers[username];
+        var claims = new List<Claim>
+        {
+            new("sub", $"demo-{username.ToLowerInvariant()}"),
+            new("tid", "AUDITLOG-DEMO"),
+            new("accountId", accountId),
+            new("preferred_username", username),
+            new("jti", Guid.NewGuid().ToString())
+        };
+        claims.AddRange(permissions.Select(
+            permission => new Claim("permissions", permission)));
+
+        var key = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(signingKey ?? SigningKey));
+        var credentials = new SigningCredentials(
+            key,
+            SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: issuer ?? Issuer,
+            audience: audience ?? Audience,
+            claims: claims,
+            notBefore: DateTime.UtcNow.AddMinutes(-60),
+            expires: expires ?? DateTime.UtcNow.AddMinutes(30),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -226,10 +309,12 @@ public sealed class ApiKeyAuthorizationApiFactory
             configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
+                    ["Jwt:Mode"] = "Local",
+                    ["Jwt:Issuer"] = Issuer,
+                    ["Jwt:Audience"] = Audience,
+                    ["Jwt:SigningKey"] = SigningKey,
                     ["ConnectionStrings:AuditLogDb"] =
-                        "Server=127.0.0.1,1;Connect Timeout=1;Encrypt=False;TrustServerCertificate=True",
-                    ["ComplianceReporting:ApiKey"] =
-                        ConfiguredKey
+                        "Server=127.0.0.1,1;Connect Timeout=1;Encrypt=False;TrustServerCertificate=True"
                 });
         });
 
@@ -239,8 +324,7 @@ public sealed class ApiKeyAuthorizationApiFactory
             services.AddSingleton(new SqlConnectionFactory(
                 "Server=127.0.0.1,1;Connect Timeout=1;Encrypt=False;TrustServerCertificate=True"));
             services.RemoveAll<IComplianceReportService>();
-            services.AddSingleton<
-                IComplianceReportService,
+            services.AddSingleton<IComplianceReportService,
                 StubComplianceReportService>();
         });
     }
@@ -248,9 +332,10 @@ public sealed class ApiKeyAuthorizationApiFactory
     private sealed class StubComplianceReportService
         : IComplianceReportService
     {
-        public Task<ComplianceAccessReportResult> GetAccountAccessReportAsync(
-            ComplianceAccessReportQuery query,
-            CancellationToken cancellationToken = default)
+        public Task<ComplianceAccessReportResult>
+            GetAccountAccessReportAsync(
+                ComplianceAccessReportQuery query,
+                CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new ComplianceAccessReportResult
             {

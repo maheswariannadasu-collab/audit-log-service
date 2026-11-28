@@ -29,6 +29,18 @@ public sealed class AuditHashingService
 
             writer.WriteString("eventType", auditEvent.EventType);
             writer.WriteString("actorId", auditEvent.ActorId);
+            if (!string.IsNullOrWhiteSpace(auditEvent.CreatedBySubject))
+            {
+                writer.WriteString(
+                    "createdBySubject",
+                    auditEvent.CreatedBySubject);
+            }
+            if (!string.IsNullOrWhiteSpace(auditEvent.CreatedByDisplayName))
+            {
+                writer.WriteString(
+                    "createdByDisplayName",
+                    auditEvent.CreatedByDisplayName);
+            }
             writer.WriteString("resourceType", auditEvent.ResourceType);
             writer.WriteString("resourceId", auditEvent.ResourceId);
 

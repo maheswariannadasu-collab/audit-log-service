@@ -4,7 +4,10 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Text.Json;
-using AuditLog.API.Auth;
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using AuditLog.BLL.Interfaces;
 using AuditLog.BLL.Services;
 using AuditLog.DAL.Data;
@@ -16,6 +19,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 
 namespace AuditLog.Tests;
 
@@ -51,9 +55,12 @@ public sealed class SqlServerApiIntegrationTests
     {
         _fixture = fixture;
         _client = fixture.Factory.CreateClient();
-        _client.DefaultRequestHeaders.Add(
-            ComplianceApiKeyDefaults.HeaderName,
-            SqlServerApiFactory.ConfiguredKey);
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                JwtAuthorizationApiFactory.CreateToken(
+                    "Administrator",
+                    "ACCOUNT100"));
     }
 
     public Task InitializeAsync()
@@ -68,7 +75,7 @@ public sealed class SqlServerApiIntegrationTests
     }
 
     [SqlServerIntegrationFact]
-    public async Task EveryApiEndpoint_RejectsMissingAndInvalidApiKeys()
+    public async Task EveryApiEndpoint_RejectsMissingAndInvalidTokens()
     {
         var endpoints = new (HttpMethod Method, string Path)[]
         {
@@ -85,7 +92,6 @@ public sealed class SqlServerApiIntegrationTests
             (HttpMethod.Get, "/api/audit-export/bundle"),
             (HttpMethod.Get,
                 "/api/compliance-reports/accounts/ACCOUNT100/access"),
-            (HttpMethod.Get, "/api/health/database")
         };
 
         using var anonymousClient = _fixture.Factory.CreateClient();
@@ -106,9 +112,10 @@ public sealed class SqlServerApiIntegrationTests
             using var invalidKeyRequest = new HttpRequestMessage(
                 endpoint.Method,
                 endpoint.Path);
-            invalidKeyRequest.Headers.Add(
-                ComplianceApiKeyDefaults.HeaderName,
-                "invalid-integration-test-key");
+            invalidKeyRequest.Headers.Authorization =
+                new AuthenticationHeaderValue(
+                    "Bearer",
+                    "invalid-integration-test-token");
             using var invalidKeyResponse =
                 await anonymousClient.SendAsync(invalidKeyRequest);
 
@@ -120,7 +127,7 @@ public sealed class SqlServerApiIntegrationTests
     }
 
     [SqlServerIntegrationFact]
-    public async Task HealthEndpoint_WithApiKey_ReportsSqlServerHealthy()
+    public async Task HealthEndpoint_ReportsSqlServerHealthy()
     {
         using var response = await _client.GetAsync("/api/health/database");
         var body = await response.Content.ReadAsStringAsync();
@@ -166,7 +173,7 @@ public sealed class SqlServerApiIntegrationTests
             eventId,
             GetProperty(getDocument.RootElement, "id").GetInt64());
         Assert.Equal(
-            actorId,
+            "demo-administrator",
             GetProperty(getDocument.RootElement, "actorId").GetString());
         Assert.Equal(
             "integration-test",
@@ -175,7 +182,7 @@ public sealed class SqlServerApiIntegrationTests
                 "device").GetString());
 
         var queryPath =
-            "/api/audit-events?actorId=" + Uri.EscapeDataString(actorId) +
+            "/api/audit-events?actorId=demo-administrator" +
             "&resourceId=" + Uri.EscapeDataString(resourceId) +
             "&pageNumber=2&pageSize=1";
         using var queryResponse = await _client.GetAsync(queryPath);
@@ -342,7 +349,7 @@ public sealed class SqlServerApiIntegrationTests
     [SqlServerIntegrationFact]
     public async Task ExportEndpoints_ReturnFilteredDataAndVerifiableChainProof()
     {
-        var targetActor = NewIdentifier("export-target");
+        var targetResource = NewIdentifier("target");
         await CreateEventAsync(
             NewIdentifier("export-before"),
             "ACCOUNT",
@@ -350,9 +357,9 @@ public sealed class SqlServerApiIntegrationTests
             DateTimeOffset.UtcNow.AddMinutes(-2),
             new { marker = "before" });
         var targetId = await CreateEventAsync(
-            targetActor,
+            "demo-administrator",
             "ACCOUNT",
-            NewIdentifier("target"),
+            targetResource,
             DateTimeOffset.UtcNow.AddMinutes(-1),
             new { marker = "target-export" });
         await CreateEventAsync(
@@ -362,9 +369,9 @@ public sealed class SqlServerApiIntegrationTests
             DateTimeOffset.UtcNow,
             new { marker = "after" });
 
-        var actorQuery = Uri.EscapeDataString(targetActor);
+        var resourceQuery = Uri.EscapeDataString(targetResource);
         using var jsonResponse = await _client.GetAsync(
-            $"/api/audit-export/json?actorId={actorQuery}");
+            $"/api/audit-export/json?resourceId={resourceQuery}");
         Assert.Equal(HttpStatusCode.OK, jsonResponse.StatusCode);
         Assert.Equal(
             "application/json",
@@ -378,7 +385,7 @@ public sealed class SqlServerApiIntegrationTests
             GetProperty(jsonEvents[0], "id").GetInt64());
 
         using var csvResponse = await _client.GetAsync(
-            $"/api/audit-export/csv?actorId={actorQuery}");
+            $"/api/audit-export/csv?resourceId={resourceQuery}");
         Assert.Equal(HttpStatusCode.OK, csvResponse.StatusCode);
         Assert.Equal(
             "text/csv",
@@ -389,7 +396,7 @@ public sealed class SqlServerApiIntegrationTests
         Assert.DoesNotContain("after", csv, StringComparison.Ordinal);
 
         using var bundleResponse = await _client.GetAsync(
-            $"/api/audit-export/bundle?actorId={actorQuery}");
+            $"/api/audit-export/bundle?resourceId={resourceQuery}");
         Assert.Equal(HttpStatusCode.OK, bundleResponse.StatusCode);
         using var bundleDocument = JsonDocument.Parse(
             await bundleResponse.Content.ReadAsStringAsync());
@@ -602,7 +609,6 @@ public sealed class SqlServerApiIntegrationTests
             new
             {
                 eventType = "INTEGRATION_TEST_EVENT",
-                actorId,
                 resourceType,
                 resourceId,
                 eventTimestampUtc = timestamp,
@@ -831,7 +837,8 @@ public sealed class SqlServerDatabaseFixture : IAsyncLifetime
             "001_CreateAuditEvents.sql",
             "002_AddAuditRetentionColumns.sql",
             "003_CreateAuditEventRedactions.sql",
-            "004_AddRedactedContentHash.sql"
+            "004_AddRedactedContentHash.sql",
+            "006_AddAuditActorIdentity.sql"
         };
 
         foreach (var migrationFile in migrationFiles)
@@ -907,9 +914,6 @@ public sealed class SqlServerDatabaseFixture : IAsyncLifetime
 public sealed class SqlServerApiFactory
     : WebApplicationFactory<Program>
 {
-    internal const string ConfiguredKey =
-        "TEST_ONLY_ComplianceApiKeyForSqlServerIntegration_0123456789";
-
     private readonly string _connectionString;
 
     public SqlServerApiFactory(string connectionString)
@@ -925,7 +929,10 @@ public sealed class SqlServerApiFactory
                 new Dictionary<string, string?>
                 {
                     ["ConnectionStrings:AuditLogDb"] = _connectionString,
-                    ["ComplianceReporting:ApiKey"] = ConfiguredKey,
+                    ["Jwt:Mode"] = "Local",
+                    ["Jwt:Issuer"] = JwtAuthorizationApiFactory.Issuer,
+                    ["Jwt:Audience"] = JwtAuthorizationApiFactory.Audience,
+                    ["Jwt:SigningKey"] = JwtAuthorizationApiFactory.SigningKey,
                     ["AuditRetention:RetentionDays"] = "1"
                 });
         });

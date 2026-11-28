@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AuditLog.API.Controllers
 {
-    [Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
     [ApiController]
     [Route("api/audit-integrity")]
     [Route("audit")]
@@ -21,6 +20,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpGet("verify")]
+        [Authorize(Policy = JwtPolicyNames.IntegrityVerify)]
         public async Task<IActionResult> Verify(
             CancellationToken cancellationToken)
         {

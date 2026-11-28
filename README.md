@@ -54,7 +54,7 @@ The application follows a layered architecture with separate controllers for dif
                       |
                       v
        Scenario A, B, and C API Controllers
-              [shared API-key policy]
+              [JWT permission policies]
                       |
                       v
                  AuditLog.BLL
@@ -212,15 +212,15 @@ Implemented functionality:
   pagination.
 - Returns the actor, event type, account, timestamp, and stored payload, using
   the existing redaction-aware query path.
-- Protects Scenario A, B, and C API endpoints with a shared configuration-
-  backed `X-Compliance-Api-Key`; the key is not stored in source control.
+- Protects Scenario A, B, and C API endpoints with local JWT Bearer
+  authentication and permission claims.
 - Reuses the existing audit-event table and query repository; no new DB
   migration is required.
 
 **Status:** Implemented for the local assessment and exercised by SQL Server
 integration tests; the engineer also confirmed validation against the target
-SQL Server database. The shared API key is not a production substitute for an
-identity provider or regulator-specific account authorization.
+SQL Server database. Account assignments come from the JWT `accountId` claim
+and will require a database lookup in production.
 
 ## 5. Database Design
 
@@ -305,8 +305,8 @@ Execute the SQL scripts available in:
 database/Scripts/
 ```
 
-Apply scripts `001` through `004` in order. Script `004` adds the redacted
-content hash required by redaction-aware verification and export.
+Apply scripts `001` through `006` in order. Script `004` adds the redacted
+content hash; script `006` adds server-verified JWT actor attribution.
 
 ### Step 4 – Configure Connection String
 
@@ -322,15 +322,29 @@ Update the connection string in `AuditLog.API/appsettings.json`.
 
 Replace the server name with your SQL Server instance.
 
-Set a local API key before starting the API. Use a random value of at least 32
-characters and keep it out of source control:
+Configure a local JWT signing key using user secrets. The signing key is not
+stored in source control:
 
 ```powershell
-$env:ComplianceReporting__ApiKey = "<your-local-random-key-of-32-or-more-characters>"
+dotnet user-secrets set "Jwt:SigningKey" "<random-key-of-at-least-32-characters>" --project AuditLog.API\AuditLog.API\AuditLog.API.csproj
 ```
 
-Send it in the `X-Compliance-Api-Key` header for Scenario A, B, and C API
-requests. Missing or invalid keys receive HTTP 401.
+The local `Jwt:Mode` setting is `Local`; issuer, audience, and authority are
+configurable in `appsettings.json`. Get a demo token:
+
+```http
+POST /auth/token
+Content-Type: application/json
+
+{
+  "username": "AuditWriter",
+  "accountId": "ACCOUNT100"
+}
+```
+
+Send the returned token as `Authorization: Bearer <token>`. Missing or invalid
+tokens receive HTTP 401; valid tokens without a required permission receive
+HTTP 403.
 
 ### Step 5 – Build Solution
 
@@ -376,23 +390,23 @@ The current controller routes are covered by the authorization tests; see
 - Genesis hash validation.
 - Input validation.
 - Integrity verification.
-- Compliance account/date filtering, report projection, and API-key validation.
+- Compliance account/date filtering, report projection, and JWT validation.
 - Domain-controller success, validation, and error responses; database-health
   failure handling.
 
 ### API Request Testing
 - HTTP-level authorization and request-model validation using the test server.
-- Missing and invalid API keys across the Scenario A, B, and C endpoints,
+- Missing and invalid JWTs across the Scenario A, B, and C endpoints,
   including database health.
 - Database-health failure response when SQL Server is unavailable.
 
 ### SQL Server Integration Testing
 
 The opt-in integration suite exercises the API against SQL Server, including
-API-key authorization, database queries, retention, redaction, exports,
+JWT authorization, database queries, retention, redaction, exports,
 compliance reports, health checks, and tampering detection. The admin
 connection uses `master` only for database setup. The suite creates a temporary
-database named `AuditLogIntegration_<id>`, applies scripts `001`–`004`, runs the
+database named `AuditLogIntegration_<id>`, applies scripts `001`–`006`, runs the
 tests against it, then drops it. The application's `AuditLogDB` is not used or
 modified. Use a dedicated test SQL Server instance, not a production or shared
 development instance.
@@ -412,10 +426,9 @@ passed all 143 tests; see [Test-Coverage.md](docs/Test-Coverage.md) for details.
 
 ### Security Testing
 - SQL database tampering detection is covered by hash-chain integration tests.
-- Missing and invalid API keys are rejected across all 13 current
-  route/method combinations, including database health.
-- The engineer confirmed unauthorized requests are rejected and every
-  controller endpoint requires a valid API key.
+- Missing and invalid JWTs are rejected across protected route/method
+  combinations.
+- The database health endpoint remains accessible without authentication.
 
 The latest verified test and coverage results are documented in
 [Test-Coverage.md](docs/Test-Coverage.md).
@@ -470,9 +483,9 @@ Azure deployment is planned and has not yet been completed.
 
 The following areas remain limitations or require further validation:
 
-- The shared API key does not identify individual users or enforce
-  account-level authorization; production requires an identity provider and
-  least-privilege policies.
+- The account assignment is currently claim-based through JWT `accountId`.
+  Production should replace this mapping with an identity-provider-backed
+  database lookup and least-privilege policies.
 - The prototype does not digitally sign or externally anchor export bundle
   chain tips.
 - Redaction does not erase values from historical SQL backups or transaction

@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AuditLog.API.Controllers
 {
-    [Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
     [ApiController]
     [Route("api/audit-retention")]
     public class AuditRetentionController : ControllerBase
@@ -19,6 +18,7 @@ namespace AuditLog.API.Controllers
         }
 
         [HttpPost("archive")]
+        [Authorize(Policy = JwtPolicyNames.RetentionManage)]
         public async Task<IActionResult> ArchiveExpiredEvents(
             CancellationToken cancellationToken)
         {

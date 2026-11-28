@@ -24,6 +24,8 @@ namespace AuditLog.DAL.Repositories
                 A.Id,
                 A.EventType,
                 A.ActorId,
+                A.CreatedBySubject,
+                A.CreatedByDisplayName,
                 A.ResourceType,
                 A.ResourceId,
                 COALESCE(R.RedactedPayloadJson, A.PayloadJson) AS PayloadJson,
@@ -59,10 +61,16 @@ namespace AuditLog.DAL.Repositories
                 Id = reader.GetInt64(0),
                 EventType = reader.GetString(1),
                 ActorId = reader.GetString(2),
-                ResourceType = reader.GetString(3),
-                ResourceId = reader.GetString(4),
-                PayloadJson = reader.GetString(5),
-                EventTimestampUtc = reader.GetDateTime(6),
+                CreatedBySubject = reader.IsDBNull(3)
+                    ? string.Empty
+                    : reader.GetString(3),
+                CreatedByDisplayName = reader.IsDBNull(4)
+                    ? string.Empty
+                    : reader.GetString(4),
+                ResourceType = reader.GetString(5),
+                ResourceId = reader.GetString(6),
+                PayloadJson = reader.GetString(7),
+                EventTimestampUtc = reader.GetDateTime(8),
                 ContentHash = (byte[])reader["ContentHash"],
                 PreviousHash = (byte[])reader["PreviousHash"],
                 RecordHash = (byte[])reader["RecordHash"]

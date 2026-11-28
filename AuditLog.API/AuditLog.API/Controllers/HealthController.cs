@@ -1,13 +1,11 @@
 ﻿using AuditLog.DAL.Data;
 using AuditLog.API.Auth;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
 namespace AuditLog.API.Controllers
 {
-    [Authorize(Policy = ComplianceApiKeyDefaults.PolicyName)]
     [Route("api/[controller]")]
     [ApiController]
     public class HealthController : ControllerBase

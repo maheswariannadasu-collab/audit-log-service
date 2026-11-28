@@ -6,6 +6,7 @@ using AuditLog.BLL.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using System.Security.Claims;
 
 namespace AuditLog.Tests;
 
@@ -23,7 +24,6 @@ public sealed class AuditEventsControllerTests
             new CreateAuditEventRequest
             {
                 EventType = "ACCOUNT_VIEWED",
-                ActorId = "USER001",
                 ResourceType = "ACCOUNT",
                 ResourceId = "ACCOUNT100",
                 EventTimestampUtc = timestamp,
@@ -38,6 +38,8 @@ public sealed class AuditEventsControllerTests
         Assert.Equal("ACCOUNT_VIEWED", repository.InsertedEvent?.EventType);
         Assert.Equal("ACCOUNT100", repository.InsertedEvent?.ResourceId);
         Assert.Equal(timestamp, repository.InsertedEvent?.EventTimestampUtc);
+        Assert.Equal("demo-auditwriter", repository.InsertedEvent?.CreatedBySubject);
+        Assert.Equal("AuditWriter", repository.InsertedEvent?.CreatedByDisplayName);
     }
 
     [Fact]
@@ -185,10 +187,26 @@ public sealed class AuditEventsControllerTests
     }
 
     private static AuditEventsController CreateController(
-        ControllerAuditEventRepository repository) =>
-        new(
+        ControllerAuditEventRepository repository)
+    {
+        var controller = new AuditEventsController(
             new AuditEventWriterService(repository),
             new AuditEventQueryService(repository));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(
+                    new ClaimsIdentity(
+                        [
+                            new Claim("sub", "demo-auditwriter"),
+                            new Claim("preferred_username", "AuditWriter")
+                        ],
+                        "JWT"))
+            }
+        };
+        return controller;
+    }
 
     private static CreateAuditEventRequest CreateAuditEventRequest(
         JsonElement payload,
@@ -196,7 +214,6 @@ public sealed class AuditEventsControllerTests
         new()
         {
             EventType = "ACCOUNT_VIEWED",
-            ActorId = "USER001",
             ResourceType = "ACCOUNT",
             ResourceId = "ACCOUNT100",
             EventTimestampUtc = timestamp,
@@ -615,7 +632,7 @@ public sealed class ComplianceReportsControllerTests
             PageNumber = 1,
             PageSize = 50
         };
-        var controller = new ComplianceReportsController(
+        var controller = CreateComplianceController(
             new StubComplianceReportService { Result = report });
 
         var result = Assert.IsType<OkObjectResult>(
@@ -630,7 +647,7 @@ public sealed class ComplianceReportsControllerTests
     [Fact]
     public async Task GetAccountAccessReport_MapsArgumentExceptionToBadRequest()
     {
-        var controller = new ComplianceReportsController(
+        var controller = CreateComplianceController(
             new StubComplianceReportService
             {
                 ExceptionToThrow = new ArgumentException("invalid report")
@@ -642,6 +659,27 @@ public sealed class ComplianceReportsControllerTests
             CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    private static ComplianceReportsController CreateComplianceController(
+        IComplianceReportService service)
+    {
+        var controller = new ComplianceReportsController(service);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(
+                    new ClaimsIdentity(
+                        [
+                            new Claim("sub", "demo-compliancereader"),
+                            new Claim("accountId", "ACCOUNT100"),
+                            new Claim("permissions", "audit.reports.read")
+                        ],
+                        "JWT"))
+            }
+        };
+        return controller;
     }
 
     private sealed class StubComplianceReportService
